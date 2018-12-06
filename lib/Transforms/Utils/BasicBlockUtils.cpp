@@ -43,6 +43,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 void llvm::DeleteDeadBlock(BasicBlock *BB, DeferredDominance *DDT) {
@@ -166,6 +169,10 @@ bool llvm::MergeBlockIntoPredecessor(BasicBlock *BB, DominatorTree *DT,
     }
   }
 
+  //Luca
+  Instruction& OldBr= PredBB->getInstList().back();
+  addInfluencers(BB->getInstList().front(), OldBr);
+  
   // Delete the unconditional branch from the predecessor...
   PredBB->getInstList().pop_back();
 

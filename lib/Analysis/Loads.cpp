@@ -23,6 +23,9 @@
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Statepoint.h"
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 static bool isAligned(const Value *Base, const APInt &Offset, unsigned Align,
@@ -328,9 +331,14 @@ Value *llvm::FindAvailableLoadedValue(LoadInst *Load,
   if (!Load->isUnordered())
     return nullptr;
 
-  return FindAvailablePtrLoadStore(
+  //Luca
+  Value* ret = FindAvailablePtrLoadStore(
       Load->getPointerOperand(), Load->getType(), Load->isAtomic(), ScanBB,
       ScanFrom, MaxInstsToScan, AA, IsLoad, NumScanedInst);
+  if (ret) {
+    addInfluencers(*Load, *ScanFrom);
+  }
+  return ret;
 }
 
 Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,

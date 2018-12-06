@@ -66,6 +66,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -3892,6 +3895,13 @@ Instruction *InstCombiner::tryOptimizeCall(CallInst *CI) {
   LibCallSimplifier Simplifier(DL, &TLI, ORE, InstCombineRAUW);
   if (Value *With = Simplifier.optimizeCall(CI)) {
     ++NumSimplified;
+    
+    //Luca
+    Instruction* W = dyn_cast<Instruction>(With);
+    if (CI->use_empty() && W) {
+      addInfluencers(*W, *CI);
+    }
+    
     return CI->use_empty() ? CI : replaceInstUsesWith(*CI, With);
   }
 

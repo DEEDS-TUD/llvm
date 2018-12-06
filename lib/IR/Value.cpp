@@ -37,6 +37,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 static cl::opt<unsigned> NonGlobalValueMaxNameSize(
@@ -411,6 +414,10 @@ void Value::doRAUW(Value *New, bool NoMetadata) {
          "this->replaceAllUsesWith(expr(this)) is NOT valid!");
   assert(New->getType() == getType() &&
          "replaceAllUses of value with new value of different type!");
+
+  //Luca
+  if (Instruction* I = dyn_cast<Instruction>(this))
+	  propagateInfluenceTraces(New, *I);
 
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)

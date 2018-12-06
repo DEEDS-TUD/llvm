@@ -24,6 +24,10 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1622,7 +1626,24 @@ bool InstCombiner::SimplifyStoreAtEndOfBlock(StoreInst &SI) {
     PHINode *PN = PHINode::Create(MergedVal->getType(), 2, "storemerge");
     PN->addIncoming(SI.getOperand(0), SI.getParent());
     PN->addIncoming(OtherStore->getOperand(0), OtherBB);
+
     MergedVal = InsertNewInstBefore(PN, DestBB->front());
+
+    //TODO: should not merge both incoming traces since one might get eliminated.
+    //Luca
+    if (Instruction* SO = dyn_cast<Instruction>(SI.getOperand(0))) {
+      propagateInfluenceTraces(SO, SI);
+    }
+    else {
+      propagateInfluenceTraces(SI.getParent()->getTerminator(), SI);
+    }
+    if (Instruction* SO = dyn_cast<Instruction>(OtherStore->getOperand(0))) {
+      propagateInfluenceTraces(SO, cast<Instruction>(*OtherStore));
+    }
+    else {
+      propagateInfluenceTraces(OtherStore->getParent()->getTerminator(),
+                               cast<Instruction>(*OtherStore));
+    }
   }
 
   // Advance to a place where it is safe to insert the new store and

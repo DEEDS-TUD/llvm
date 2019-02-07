@@ -101,7 +101,7 @@ namespace {
           continue;
 
         bool linePresent = false;
-        /*for (uint64_t i = 1; i < tagwatermark; i++) {
+        for (uint64_t i = 1; i < tagwatermark; i++) {
           if (DL.getLine() == inputInstructionLocations[i].getLine()) {
             linePresent = true;
             std::set<unsigned> influencer;
@@ -109,7 +109,7 @@ namespace {
             addInfluencers(&(*I), influencer);
             break;
           }
-        }*/
+        }
         if (!linePresent) {
           std::set<unsigned> influencer;
           influencer.insert(tagwatermark);

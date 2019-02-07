@@ -34,6 +34,10 @@ void initializeObjCARCOpts(PassRegistry&);
 /// Initialize all passes linked into the Vectorize library.
 void initializeVectorization(PassRegistry&);
 
+//LUCA
+/// Initialize all passes linked into the InfluenceTracing library.
+void initializeInfluenceTracing(PassRegistry&);
+
 /// Initialize all passes linked into the InstCombine library.
 void initializeInstCombine(PassRegistry&);
 
@@ -173,6 +177,8 @@ void initializeIndVarSimplifyLegacyPassPass(PassRegistry&);
 void initializeIndirectBrExpandPassPass(PassRegistry&);
 void initializeInferAddressSpacesPass(PassRegistry&);
 void initializeInferFunctionAttrsLegacyPassPass(PassRegistry&);
+void initializeInfluenceTracingDetectEliminatedInstructionsPass(PassRegistry&);//Luca
+void initializeInfluenceTracingTagPass(PassRegistry&);//Luca
 void initializeInlineCostAnalysisPass(PassRegistry&);
 void initializeInstCountPass(PassRegistry&);
 void initializeInstNamerPass(PassRegistry&);

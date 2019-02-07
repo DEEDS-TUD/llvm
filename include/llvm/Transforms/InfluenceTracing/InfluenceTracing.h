@@ -4,20 +4,38 @@
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/PassManager.h"
 #include <initializer_list>
 #include <set>
 
 
 #include "llvm/Support/raw_ostream.h"
 namespace llvm {
+
+  class InfluenceTracingTagPass
+      : public PassInfoMixin<InfluenceTracingTagPass> {
+
+  public:
+    InfluenceTracingTagPass() : tagwatermark(1) {};
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+
+  private:
+    uint64_t tagwatermark;
+  };
+  FunctionPass *createInfluenceTracingTagPass();
+
+  class InfluenceTracingDetectEliminatedCodePass
+      : public PassInfoMixin<InfluenceTracingDetectEliminatedCodePass> {
+
+  public:
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+  };
+  ModulePass *createInfluenceTracingDetectEliminatedCodePass();
+
   /*
    * Converts a set of ints to a metadata tuple.
    */
   static MDTuple* getInfluenceTracesTuple(LLVMContext& C, std::set<unsigned> influencers) {
-	/*for(unsigned i: influencers) {
-		errs() << i << ", ";
-	}
-	errs() << "\n";*/
     std::vector<Metadata*> mdTags;
     for(unsigned i: influencers) {
       ConstantInt* CI = ConstantInt::get(IntegerType::get(C, 64), i);
@@ -37,8 +55,9 @@ namespace llvm {
   /*
    * Returns all influencers of I as a set of unsigned ints.
    */
-  static std::set<unsigned> getInfluencers(Instruction& I) {
-    std::set<unsigned> influencers;
+  static std::set<unsigned> getInfluencers(const Value* V) {
+    std::set<unsigned> influencers = V->getInfluenceTraces();
+    /*std::set<unsigned> influencers;
     MDTuple* IT = dyn_cast_or_null<MDTuple>(I.getMetadata("inftrc"));
     if(IT) {
       for (auto i = IT->op_begin(); i != IT->op_end(); i++) {
@@ -50,7 +69,7 @@ namespace llvm {
           }
         }
       }
-    }
+    }*/
     return influencers;
   }
   
@@ -58,13 +77,17 @@ namespace llvm {
    * Returns a set of all influencers of this Instruction and its operands (recursive).
    */
   //TODO: naming
-  static std::set<unsigned> getInfluencersRecursive(Instruction& I) {
-    std::set<unsigned> influencers = getInfluencers(I);
+  static std::set<unsigned> getInfluencersRecursive(const Instruction& I) {
+    std::set<unsigned> influencers = getInfluencers(&I);
     unsigned numOperands = I.getNumOperands();
     for (unsigned i = 0; i < numOperands; i++) {
       Instruction* O = dyn_cast_or_null<Instruction>(I.getOperand(i));
       if (O) {
-        std::set<unsigned> influencers2 = getInfluencers(*O);
+        //std::set<unsigned> influencers2 = getInfluencers(O);
+        //join(influencers, influencers2);
+      }
+      else {
+        std::set<unsigned> influencers2 = I.getOperand(i)->getInfluenceTraces();
         join(influencers, influencers2);
       }
     }
@@ -74,42 +97,44 @@ namespace llvm {
   /*
    * Marks I as influenced by all int in the set.
    */
-  static void setInfluenceTraces(Instruction& I, std::set<unsigned> influencers) {
-    LLVMContext& C = I.getContext();
-    I.setMetadata("inftrc", getInfluenceTracesTuple(C, influencers));
+  static void setInfluenceTraces(Value* V, std::set<unsigned> influencers) {
+    //LLVMContext& C = I.getContext();
+    //I.setMetadata("inftrc", getInfluenceTracesTuple(C, influencers));
+    V->setInfluenceTraces(influencers);
   }
   
   /*
    * Joins the influencers with the existing influencers of I.
    */
-  static void addInfluencers(Instruction& I, std::set<unsigned>& influencers) {
-    std::set<unsigned> influencersI = getInfluencers(I);
-    join(influencersI, influencers);
-    setInfluenceTraces(I, influencersI);
+  static void addInfluencers(Value* V, std::set<unsigned>& influencers) {
+    std::set<unsigned> influencersV = getInfluencers(V);
+    join(influencersV, influencers);
+    setInfluenceTraces(V, influencersV);
   }
   
   /*
    * Joins the influencers of B with the existing influencers for A.
    */
-  static void addInfluencers(Instruction& A, Instruction& B) {
-    std::set<unsigned> influencersB = getInfluencers(B);
-    addInfluencers(A, influencersB);
+  static void addInfluencers(Instruction& A, const Instruction& B) {
+    std::set<unsigned> influencersB = getInfluencers(&B);
+    addInfluencers(&A, influencersB);
   }
   
   /*
    * Marks V, or all Instructions using V if V is not an instruction, as influenced by I.
    */
-  static void propagateInfluenceTraces(Value* V, Instruction& I) {
+  static void propagateInfluenceTraces(Value* V, const Instruction& I) {
     if(V == nullptr) {
       errs() << "Null propagate\n";
       return;
     }
     std::set<unsigned> influencers = getInfluencersRecursive(I);
-    if (Instruction* I2 = dyn_cast<Instruction>(V)) {
+    addInfluencers(V, influencers);
+    /*if (Instruction* I2 = dyn_cast<Instruction>(V)) {
       addInfluencers(*I2, influencers);
     }
     else {
-      for (User* U: I.users()) {
+      for (User* U: V->users()) {
         if (Instruction* I2 = dyn_cast<Instruction>(U)) {
           //keep old and new traces
           std::set<unsigned> influencers2 = getInfluencers(*I2);
@@ -121,7 +146,7 @@ namespace llvm {
           errs() << "\n";
         }
       }
-    }
+    }*/
   }
 }
 

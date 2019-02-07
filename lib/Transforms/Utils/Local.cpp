@@ -82,6 +82,9 @@
 #include <map>
 #include <utility>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -123,7 +126,9 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       OldDest->removePredecessor(BB);
 
       // Replace the conditional branch with an unconditional one.
-      Builder.CreateBr(Destination);
+      //Luca
+      BranchInst* NewBI = Builder.CreateBr(Destination);
+      propagateInfluenceTraces(NewBI, *cast<Instruction>(BI));
       BI->eraseFromParent();
       if (DDT)
         DDT->deleteEdge(BB, OldDest);
@@ -140,7 +145,9 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       Dest1->removePredecessor(BI->getParent());
 
       // Replace the conditional branch with an unconditional one.
-      Builder.CreateBr(Dest1);
+      //Luca
+      BranchInst* NewBI = Builder.CreateBr(Dest1);
+      propagateInfluenceTraces(NewBI, *cast<Instruction>(BI));
       Value *Cond = BI->getCondition();
       BI->eraseFromParent();
       if (DeleteDeadConditions)
@@ -301,7 +308,9 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
         Updates.reserve(IBI->getNumDestinations() - 1);
 
       // Insert the new branch.
-      Builder.CreateBr(TheOnlyDest);
+      //Luca
+      BranchInst* NewBI = Builder.CreateBr(TheOnlyDest);
+      propagateInfluenceTraces(NewBI, *cast<Instruction>(IBI));
 
       for (unsigned i = 0, e = IBI->getNumDestinations(); i != e; ++i) {
         if (IBI->getDestination(i) == TheOnlyDest) {
@@ -1014,6 +1023,14 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
   }
 
   if (Succ->getSinglePredecessor()) {
+    //Luca
+    Instruction *TI = BB->getTerminator();
+    if (TI)
+      for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
+        BasicBlock *Pred = *PI;
+        propagateInfluenceTraces(Pred->getTerminator(), *TI);
+      }
+
     // BB is the only predecessor of Succ, so Succ will end up with exactly
     // the same predecessors BB had.
 
@@ -1039,6 +1056,14 @@ bool llvm::TryToSimplifyUncondBranchFromEmptyBlock(BasicBlock *BB,
         BasicBlock *Pred = *PI;
         Pred->getTerminator()->setMetadata(LoopMDKind, LoopMD);
       }
+
+
+  //Luca
+  if (TI)
+    for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
+      BasicBlock *Pred = *PI;
+      propagateInfluenceTraces(Pred->getTerminator(), *TI);
+    }
 
   // Everything that jumped to BB now goes to Succ.
   BB->replaceAllUsesWith(Succ);

@@ -170,8 +170,9 @@ bool llvm::MergeBlockIntoPredecessor(BasicBlock *BB, DominatorTree *DT,
   }
 
   //Luca
-  Instruction& OldBr= PredBB->getInstList().back();
-  addInfluencers(BB->getInstList().front(), OldBr);
+  Instruction& OldBr = PredBB->getInstList().back();
+  addInfluencers(BB->front(), OldBr);
+
   
   // Delete the unconditional branch from the predecessor...
   PredBB->getInstList().pop_back();
@@ -656,6 +657,9 @@ ReturnInst *llvm::FoldReturnIntoUncondBranch(ReturnInst *RI, BasicBlock *BB,
   // Clone the return and add it to the end of the predecessor.
   Instruction *NewRet = RI->clone();
   Pred->getInstList().push_back(NewRet);
+
+  //Luca
+  propagateInfluenceTraces(NewRet, *UncondBranch);
 
   // If the return instruction returns a value, and if the value was a
   // PHI node in "BB", propagate the right value into the return.

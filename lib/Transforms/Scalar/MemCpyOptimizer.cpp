@@ -61,6 +61,9 @@
 #include <cstdint>
 #include <utility>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "memcpyopt"
@@ -489,6 +492,9 @@ Instruction *MemCpyOptPass::tryMergingIntoMemset(Instruction *StartInst,
 
     // Zap all the stores.
     for (Instruction *SI : Range.TheStores) {
+      //Luca
+      addInfluencers(*AMemSet, *SI);
+
       MD->removeInstruction(SI);
       SI->eraseFromParent();
     }
@@ -689,6 +695,10 @@ bool MemCpyOptPass::processStore(StoreInst *SI, BasicBlock::iterator &BBI) {
           LI->eraseFromParent();
           ++NumMemCpyInstr;
 
+          //Luca
+          addInfluencers(*M, *SI);
+          addInfluencers(*M, *LI);
+
           // Make sure we do not invalidate the iterator.
           BBI = M->getIterator();
           return true;
@@ -771,6 +781,9 @@ bool MemCpyOptPass::processStore(StoreInst *SI, BasicBlock::iterator &BBI) {
                                      Size, Align, SI->isVolatile());
 
       LLVM_DEBUG(dbgs() << "Promoting " << *SI << " to " << *M << "\n");
+
+      //Luca
+      addInfluencers(*M, *SI);
 
       MD->removeInstruction(SI);
       SI->eraseFromParent();

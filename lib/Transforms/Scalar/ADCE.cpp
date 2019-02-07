@@ -52,6 +52,9 @@
 #include <cstddef>
 #include <utility>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "adce"
@@ -660,6 +663,9 @@ void AggressiveDeadCodeElimination::makeUnconditional(BasicBlock *BB,
   InstInfo[NewTerm].Live = true;
   if (const DILocation *DL = PredTerm->getDebugLoc())
     NewTerm->setDebugLoc(DL);
+
+  //Luca
+  propagateInfluenceTraces(NewTerm, *PredTerm);
 
   InstInfo.erase(PredTerm);
   PredTerm->eraseFromParent();

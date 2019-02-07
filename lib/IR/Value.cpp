@@ -69,7 +69,8 @@ Value::Value(Type *ty, unsigned scid)
            (/*SubclassID < ConstantFirstVal ||*/ SubclassID > ConstantLastVal))
     assert((VTy->isFirstClassType() || VTy->isVoidTy()) &&
            "Cannot create non-first-class values except for constants!");
-  static_assert(sizeof(Value) == 2 * sizeof(void *) + 2 * sizeof(unsigned),
+  //Luca
+  static_assert(sizeof(Value) == 2 * sizeof(void *) + 2 * sizeof(unsigned) + sizeof(std::set<unsigned>),
                 "Value too big");
 }
 
@@ -415,10 +416,6 @@ void Value::doRAUW(Value *New, bool NoMetadata) {
   assert(New->getType() == getType() &&
          "replaceAllUses of value with new value of different type!");
 
-  //Luca
-  if (Instruction* I = dyn_cast<Instruction>(this))
-	  propagateInfluenceTraces(New, *I);
-
   // Notify all ValueHandles (if present) that this value is going away.
   if (HasValueHandle)
     ValueHandleBase::ValueIsRAUWd(this, New);
@@ -441,6 +438,15 @@ void Value::doRAUW(Value *New, bool NoMetadata) {
 
   if (BasicBlock *BB = dyn_cast<BasicBlock>(this))
     BB->replaceSuccessorsPhiUsesWith(cast<BasicBlock>(New));
+
+  //Luca
+  if (Instruction* I = dyn_cast<Instruction>(this)) {
+    propagateInfluenceTraces(New, *I);
+  }
+  else {
+    std::set<unsigned> influencers = getInfluenceTraces();
+    addInfluencers(New, influencers);
+  }
 }
 
 void Value::replaceAllUsesWith(Value *New) {
@@ -511,16 +517,35 @@ static const Value *stripPointerCastsAndOffsets(const Value *V) {
         break;
       }
       V = GEP->getPointerOperand();
+
+      // Luca
+      std::set<unsigned> influencers = GEP->getInfluenceTraces();
+      addInfluencers((Value*)(void*)V, influencers);
+
     } else if (Operator::getOpcode(V) == Instruction::BitCast ||
                Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
+
+      // Luca
+      std::set<unsigned> influencers = V->getInfluenceTraces();
+      addInfluencers(cast<Operator>(V)->getOperand(0), influencers);
+
       V = cast<Operator>(V)->getOperand(0);
     } else if (auto *GA = dyn_cast<GlobalAlias>(V)) {
       if (StripKind == PSK_ZeroIndices || GA->isInterposable())
         return V;
+
+      // Luca
+      std::set<unsigned> influencers = V->getInfluenceTraces();
+      addInfluencers((Value*)(void*)GA->getAliasee(), influencers);
+
       V = GA->getAliasee();
     } else {
       if (auto CS = ImmutableCallSite(V)) {
         if (const Value *RV = CS.getReturnedArgOperand()) {
+          // Luca
+          std::set<unsigned> influencers = V->getInfluenceTraces();
+          addInfluencers((Value*)(void*)RV, influencers);
+
           V = RV;
           continue;
         }
@@ -530,6 +555,10 @@ static const Value *stripPointerCastsAndOffsets(const Value *V) {
         if (StripKind == PSK_ZeroIndicesAndAliasesAndInvariantGroups &&
             (CS.getIntrinsicID() == Intrinsic::launder_invariant_group ||
              CS.getIntrinsicID() == Intrinsic::strip_invariant_group)) {
+          // Luca
+          std::set<unsigned> influencers = V->getInfluenceTraces();
+          addInfluencers((Value*)(void*)CS.getArgOperand(0), influencers);
+
           V = CS.getArgOperand(0);
           continue;
         }

@@ -19,6 +19,9 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/Type.h"
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 Instruction::Instruction(Type *ty, unsigned it, Use *Ops, unsigned NumOps,
@@ -674,6 +677,8 @@ Instruction *Instruction::clone() const {
 
   New->SubclassOptionalData = SubclassOptionalData;
   New->copyMetadata(*this);
+  //Luca
+  propagateInfluenceTraces(New, *this);
   return New;
 }
 

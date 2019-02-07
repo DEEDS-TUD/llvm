@@ -84,6 +84,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "argpromotion"
@@ -333,6 +336,10 @@ doPromotion(Function *F, SmallPtrSetImpl<Argument *> &ArgsToPromote,
         AttributeList::get(F->getContext(), CallPAL.getFnAttributes(),
                            CallPAL.getRetAttributes(), ArgAttrVec));
     NewCS->setDebugLoc(Call->getDebugLoc());
+
+    //Luca
+    propagateInfluenceTraces(cast<Value>(NewCS.getInstruction()), *Call);
+
     uint64_t W;
     if (Call->extractProfTotalWeight(W))
       NewCS->setProfWeight(W);
@@ -463,6 +470,10 @@ doPromotion(Function *F, SmallPtrSetImpl<Argument *> &ArgsToPromote,
           L->replaceAllUsesWith(&*TheArg);
           L->eraseFromParent();
         }
+
+        //Luca
+        propagateInfluenceTraces(cast<Value>(TheArg), *GEP);
+
         GEP->eraseFromParent();
       }
     }

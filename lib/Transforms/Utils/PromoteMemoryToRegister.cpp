@@ -52,6 +52,8 @@
 #include <iterator>
 #include <utility>
 #include <vector>
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
 
 using namespace llvm;
 
@@ -416,6 +418,10 @@ static bool rewriteSingleStoreAlloca(AllocaInst *AI, AllocaInfo &Info,
       addAssumeNonNull(AC, LI);
 
     LI->replaceAllUsesWith(ReplVal);
+
+    //Luca
+    propagateInfluenceTraces(ReplVal, *OnlyStore);
+
     LI->eraseFromParent();
     LBI.deleteValue(LI);
   }
@@ -515,6 +521,9 @@ static bool promoteSingleBlockAlloca(AllocaInst *AI, const AllocaInfo &Info,
       // code.
       if (ReplVal == LI)
         ReplVal = UndefValue::get(LI->getType());
+
+      //Luca
+      propagateInfluenceTraces(ReplVal, *std::prev(I)->second);
 
       LI->replaceAllUsesWith(ReplVal);
     }
@@ -989,6 +998,9 @@ NextIteration:
       // what value were we writing?
       unsigned AllocaNo = ai->second;
       IncomingVals[AllocaNo] = SI->getOperand(0);
+
+      //Luca
+      propagateInfluenceTraces(SI->getOperand(0), *SI);
 
       // Record debuginfo for the store before removing it.
       IncomingLocs[AllocaNo] = SI->getDebugLoc();

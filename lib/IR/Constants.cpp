@@ -30,6 +30,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -1846,8 +1849,15 @@ Constant *ConstantExpr::get(unsigned Opcode, Constant *C1, Constant *C2,
   }
 #endif
 
-  if (Constant *FC = ConstantFoldBinaryInstruction(Opcode, C1, C2))
+  if (Constant *FC = ConstantFoldBinaryInstruction(Opcode, C1, C2)) {
+    // Luca
+    /*std::set<unsigned> influencers = C1->getInfluenceTraces();
+    addInfluencers(FC, influencers);
+    influencers = C2->getInfluenceTraces();
+    addInfluencers(FC, influencers);*/
+
     return FC;          // Fold a few common cases.
+  }
 
   if (OnlyIfReducedTy == C1->getType())
     return nullptr;
@@ -2004,8 +2014,15 @@ Constant *ConstantExpr::getICmp(unsigned short pred, Constant *LHS,
   assert(CmpInst::isIntPredicate((CmpInst::Predicate)pred) &&
          "Invalid ICmp Predicate");
 
-  if (Constant *FC = ConstantFoldCompareInstruction(pred, LHS, RHS))
+  if (Constant *FC = ConstantFoldCompareInstruction(pred, LHS, RHS)) {
+    // Luca
+    /*std::set<unsigned> influencers = LHS->getInfluenceTraces();
+    addInfluencers(FC, influencers);
+    influencers = RHS->getInfluenceTraces();
+    addInfluencers(FC, influencers);*/
+
     return FC;          // Fold a few common cases...
+  }
 
   if (OnlyIfReduced)
     return nullptr;
@@ -2029,8 +2046,15 @@ Constant *ConstantExpr::getFCmp(unsigned short pred, Constant *LHS,
   assert(CmpInst::isFPPredicate((CmpInst::Predicate)pred) &&
          "Invalid FCmp Predicate");
 
-  if (Constant *FC = ConstantFoldCompareInstruction(pred, LHS, RHS))
+  if (Constant *FC = ConstantFoldCompareInstruction(pred, LHS, RHS)) {
+    // Luca
+    std::set<unsigned> influencers = LHS->getInfluenceTraces();
+    addInfluencers(FC, influencers);
+    influencers = RHS->getInfluenceTraces();
+    addInfluencers(FC, influencers);
+
     return FC;          // Fold a few common cases...
+  }
 
   if (OnlyIfReduced)
     return nullptr;

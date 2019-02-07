@@ -22,6 +22,7 @@
 #include <cassert>
 #include <iterator>
 #include <memory>
+#include <set>
 
 namespace llvm {
 
@@ -75,6 +76,9 @@ class Value {
   //   http://www.llvm.org/docs/ProgrammersManual.html#the-waymarking-algorithm
   Type *VTy;
   Use *UseList;
+
+  //Luca
+  std::set<unsigned> InfluenceTraces;
 
   friend class ValueAsMetadata; // Allow access to IsUsedByMD.
   friend class ValueHandleBase;
@@ -449,6 +453,14 @@ public:
 #define HANDLE_CONSTANT_MARKER(Marker, Constant) Marker = Constant##Val,
 #include "llvm/IR/Value.def"
   };
+
+  //Luca
+  std::set<unsigned> getInfluenceTraces() const {
+    return InfluenceTraces;
+  }
+  void setInfluenceTraces(std::set<unsigned>& traces) {
+    InfluenceTraces = traces;
+  }
 
   /// Return an ID for the concrete type of this object.
   ///

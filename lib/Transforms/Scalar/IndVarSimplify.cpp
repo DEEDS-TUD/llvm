@@ -84,6 +84,9 @@
 #include <cstdint>
 #include <utility>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "indvars"
@@ -444,6 +447,9 @@ void IndVarSimplify::handleFloatingPointIV(Loop *L, PHINode *PN) {
                               Incr->getName()+".int", Incr);
   NewPHI->addIncoming(NewAdd, PN->getIncomingBlock(BackEdge));
 
+  //Luca
+  propagateInfluenceTraces(NewPHI, *PN);
+
   ICmpInst *NewCompare = new ICmpInst(TheBr, NewPred, NewAdd,
                                       ConstantInt::get(Int32Ty, ExitValue),
                                       Compare->getName());
@@ -457,6 +463,9 @@ void IndVarSimplify::handleFloatingPointIV(Loop *L, PHINode *PN) {
   NewCompare->takeName(Compare);
   Compare->replaceAllUsesWith(NewCompare);
   RecursivelyDeleteTriviallyDeadInstructions(Compare, TLI);
+
+  //Luca
+  propagateInfluenceTraces(NewAdd, *Incr);
 
   // Delete the old floating point increment.
   Incr->replaceAllUsesWith(UndefValue::get(Incr->getType()));
@@ -1599,6 +1608,9 @@ PHINode *WidenIV::createWideIV(SCEVExpander &Rewriter) {
       cast<Instruction>(OrigPhi->getIncomingValueForBlock(LatchBlock));
     WideInc->setDebugLoc(OrigInc->getDebugLoc());
   }
+
+  //Luca
+  propagateInfluenceTraces(WidePhi, *OrigPhi);
 
   LLVM_DEBUG(dbgs() << "Wide IV: " << *WidePhi << "\n");
   ++NumWidened;

@@ -38,6 +38,9 @@
 #include <limits>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "lower-switch"
@@ -425,7 +428,9 @@ void LowerSwitch::processSwitchInst(SwitchInst *SI,
 
   // If there is only the default destination, just branch.
   if (!SI->getNumCases()) {
-    BranchInst::Create(Default, CurBlock);
+    //Luca
+    BranchInst* NewBI = BranchInst::Create(Default, CurBlock);
+    propagateInfluenceTraces(NewBI, *cast<Instruction>(SI));
     SI->eraseFromParent();
     return;
   }
@@ -510,7 +515,9 @@ void LowerSwitch::processSwitchInst(SwitchInst *SI,
 
     // If there are no cases left, just branch.
     if (Cases.empty()) {
-      BranchInst::Create(Default, CurBlock);
+      //Luca
+      BranchInst* NewBI = BranchInst::Create(Default, CurBlock);
+      propagateInfluenceTraces(NewBI, *cast<Instruction>(SI));
       SI->eraseFromParent();
       // As all the cases have been replaced with a single branch, only keep
       // one entry in the PHI nodes.

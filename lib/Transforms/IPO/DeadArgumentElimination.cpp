@@ -50,6 +50,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "deadargelim"
@@ -209,6 +212,10 @@ bool DeadArgumentEliminationPass::DeleteDeadVarargs(Function &Fn) {
     NewCS.setCallingConv(CS.getCallingConv());
     NewCS.setAttributes(PAL);
     NewCS->setDebugLoc(Call->getDebugLoc());
+
+    //Luca
+    propagateInfluenceTraces(cast<Value>(NewCS.getInstruction()), *Call);
+
     uint64_t W;
     if (Call->extractProfTotalWeight(W))
       NewCS->setProfWeight(W);
@@ -995,6 +1002,9 @@ bool DeadArgumentEliminationPass::RemoveDeadStuffFromFunction(Function *F) {
         New->takeName(Call);
       }
     }
+
+    //Luca
+    propagateInfluenceTraces(cast<Value>(NewCS.getInstruction()), *Call);
 
     // Finally, remove the old call from the program, reducing the use-count of
     // F.

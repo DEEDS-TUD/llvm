@@ -39,6 +39,10 @@
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/KnownBits.h"
 #include <algorithm>
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -3285,8 +3289,12 @@ static Value *SimplifyICmpInst(unsigned Predicate, Value *LHS, Value *RHS,
         // also a case of comparing two zero-extended values.
         if (RExt == CI && MaxRecurse)
           if (Value *V = SimplifyICmpInst(ICmpInst::getUnsignedPredicate(Pred),
-                                        SrcOp, Trunc, Q, MaxRecurse-1))
+                                        SrcOp, Trunc, Q, MaxRecurse-1)) {
+            // Luca
+            propagateInfluenceTraces(V, *LI);
+
             return V;
+          }
 
         // Otherwise the upper bits of LHS are zero while RHS has a non-zero bit
         // there.  Use this to work out the result of the comparison.

@@ -513,6 +513,8 @@ static LoadInst *combineLoadToNewType(InstCombiner &IC, LoadInst &LI, Type *NewT
       break;
     }
   }
+  //Luca
+  propagateInfluenceTraces(NewLoad, LI);
   return NewLoad;
 }
 
@@ -567,6 +569,8 @@ static StoreInst *combineStoreToNewValue(InstCombiner &IC, StoreInst &SI, Value 
       break;
     }
   }
+  //Luca
+  propagateInfluenceTraces(NewStore, SI);
 
   return NewStore;
 }
@@ -1629,21 +1633,9 @@ bool InstCombiner::SimplifyStoreAtEndOfBlock(StoreInst &SI) {
 
     MergedVal = InsertNewInstBefore(PN, DestBB->front());
 
-    //TODO: should not merge both incoming traces since one might get eliminated.
     //Luca
-    if (Instruction* SO = dyn_cast<Instruction>(SI.getOperand(0))) {
-      propagateInfluenceTraces(SO, SI);
-    }
-    else {
-      propagateInfluenceTraces(SI.getParent()->getTerminator(), SI);
-    }
-    if (Instruction* SO = dyn_cast<Instruction>(OtherStore->getOperand(0))) {
-      propagateInfluenceTraces(SO, cast<Instruction>(*OtherStore));
-    }
-    else {
-      propagateInfluenceTraces(OtherStore->getParent()->getTerminator(),
-                               cast<Instruction>(*OtherStore));
-    }
+    propagateInfluenceTraces(SI.getOperand(0), SI);
+    propagateInfluenceTraces(OtherStore->getOperand(0), cast<Instruction>(*OtherStore));
   }
 
   // Advance to a place where it is safe to insert the new store and

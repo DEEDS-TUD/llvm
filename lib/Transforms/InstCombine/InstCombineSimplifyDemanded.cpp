@@ -18,6 +18,9 @@
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/KnownBits.h"
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -184,8 +187,14 @@ Value *InstCombiner::SimplifyDemandedUseBits(Value *V, APInt DemandedMask,
 
     // If all of the demanded bits are known 1 on one side, return the other.
     // These bits cannot contribute to the result of the 'and'.
-    if (DemandedMask.isSubsetOf(LHSKnown.Zero | RHSKnown.One))
+    if (DemandedMask.isSubsetOf(LHSKnown.Zero | RHSKnown.One)) {
+      // Luca
+      /*std::set<unsigned> influencers = I->getOperand(1)->getInfluenceTraces();
+      addInfluencers(I->getOperand(0), influencers);
+      propagateInfluenceTraces(I->getOperand(0), *I);*/
+
       return I->getOperand(0);
+    }
     if (DemandedMask.isSubsetOf(RHSKnown.Zero | LHSKnown.One))
       return I->getOperand(1);
 

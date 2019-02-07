@@ -336,7 +336,7 @@ Value *llvm::FindAvailableLoadedValue(LoadInst *Load,
       Load->getPointerOperand(), Load->getType(), Load->isAtomic(), ScanBB,
       ScanFrom, MaxInstsToScan, AA, IsLoad, NumScanedInst);
   if (ret) {
-    addInfluencers(*Load, *ScanFrom);
+    propagateInfluenceTraces(Load, *ScanFrom);
   }
   return ret;
 }
@@ -388,6 +388,10 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
         if (LI->isAtomic() < AtLeastAtomic)
           return nullptr;
 
+        //Luca
+        std::set<unsigned> influencers = StrippedPtr->getInfluenceTraces();
+        addInfluencers(LI, influencers);
+
         if (IsLoadCSE)
             *IsLoadCSE = true;
         return LI;
@@ -406,6 +410,10 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
         // other way around.
         if (SI->isAtomic() < AtLeastAtomic)
           return nullptr;
+
+        //Luca
+        std::set<unsigned> influencers = StrippedPtr->getInfluenceTraces();
+        addInfluencers(SI, influencers);
 
         if (IsLoadCSE)
           *IsLoadCSE = false;

@@ -197,6 +197,9 @@ Instruction *InstCombiner::SimplifyAnyMemTransfer(AnyMemTransferInst *MI) {
     S->setOrdering(AtomicOrdering::Unordered);
   }
 
+  //Luca
+  propagateInfluenceTraces(S, *MI);
+
   // Set the size of the copy to 0, it will be deleted on the next iteration.
   MI->setLength(Constant::getNullValue(MemOpLength->getType()));
   return MI;
@@ -237,6 +240,9 @@ Instruction *InstCombiner::SimplifyAnyMemSet(AnyMemSetInst *MI) {
     S->setAlignment(Alignment);
     if (isa<AtomicMemSetInst>(MI))
       S->setOrdering(AtomicOrdering::Unordered);
+
+    //Luca
+    propagateInfluenceTraces(S, *MI);
 
     // Set the size of the copy to 0, it will be deleted on the next iteration.
     MI->setLength(Constant::getNullValue(LenC->getType()));
@@ -3899,7 +3905,7 @@ Instruction *InstCombiner::tryOptimizeCall(CallInst *CI) {
     //Luca
     Instruction* W = dyn_cast<Instruction>(With);
     if (CI->use_empty() && W) {
-      addInfluencers(*W, *CI);
+      propagateInfluenceTraces(W, *CI);
     }
     
     return CI->use_empty() ? CI : replaceInstUsesWith(*CI, With);

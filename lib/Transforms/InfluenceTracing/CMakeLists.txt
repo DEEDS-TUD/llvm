@@ -1,5 +1,11 @@
-add_llvm_loadable_module(InfluenceTracing
+add_llvm_library(LLVMInfluenceTracing
   InfluenceTracing.cpp
-  PLUGIN_TOOL
-  opt
+  ex3.cpp
+
+  ADDITIONAL_HEADER_DIRS
+  ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms
+  ${LLVM_MAIN_INCLUDE_DIR}/llvm/Transforms/InfluenceTracing
+
+  DEPENDS
+  intrinsics_gen
   )

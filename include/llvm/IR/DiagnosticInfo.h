@@ -76,7 +76,8 @@ enum DiagnosticKind {
   DK_MIRParser,
   DK_PGOProfile,
   DK_Unsupported,
-  DK_FirstPluginKind
+  DK_FirstPluginKind,
+  DK_EliminatedCode
 };
 
 /// Get the next available kind ID for a plugin diagnostic.
@@ -986,6 +987,24 @@ public:
   const Twine &getMessage() const { return Msg; }
 
   void print(DiagnosticPrinter &DP) const override;
+};
+
+// Luca
+/// Diagnostic information for eliminated code.
+class DiagnosticInfoEliminatedCode : public DiagnosticInfoWithLocationBase {
+public:
+  DiagnosticInfoEliminatedCode(
+      const Function &F, const DiagnosticLocation &L, unsigned tag)
+      : DiagnosticInfoWithLocationBase(DK_EliminatedCode, DS_Warning, F, L), tag(tag) {}
+
+  static bool classof(const DiagnosticInfo *DI) {
+    return DI->getKind() == DK_EliminatedCode;
+  }
+
+  void print(DiagnosticPrinter &DP) const override;
+
+private:
+  unsigned tag;
 };
 
 namespace yaml {

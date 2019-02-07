@@ -18,6 +18,10 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/PatternMatch.h"
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -40,6 +44,9 @@ void InstCombiner::PHIArgMergedDebugLoc(Instruction *Inst, PHINode &PN) {
   for (unsigned i = 1; i != PN.getNumIncomingValues(); ++i) {
     auto *I = cast<Instruction>(PN.getIncomingValue(i));
     Inst->applyMergedLocation(Inst->getDebugLoc(), I->getDebugLoc());
+
+    // Luca
+    propagateInfluenceTraces(Inst, *I);
   }
 }
 

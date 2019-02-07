@@ -104,6 +104,9 @@
 #include <string>
 #include <utility>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -1020,6 +1023,10 @@ Instruction *InstCombiner::foldOpIntoPhi(Instruction &I, PHINode *PN) {
     replaceInstUsesWith(*User, NewPN);
     eraseInstFromFunction(*User);
   }
+
+  // Luca
+  propagateInfluenceTraces(NewPN, *PN);
+
   return replaceInstUsesWith(I, NewPN);
 }
 
@@ -2317,6 +2324,10 @@ Instruction *InstCombiner::visitBranchInst(BranchInst &BI) {
   BasicBlock *FalseDest;
   if (match(&BI, m_Br(m_Not(m_Value(X)), TrueDest, FalseDest)) &&
       !isa<Constant>(X)) {
+    //Luca
+    std::set<unsigned> influencers = BI.getCondition()->getInfluenceTraces();
+    addInfluencers(&BI, influencers);
+
     // Swap Destinations and condition...
     BI.setCondition(X);
     BI.swapSuccessors();

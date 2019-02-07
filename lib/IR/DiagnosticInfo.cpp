@@ -308,7 +308,6 @@ bool DiagnosticInfoOptimizationFailure::isEnabled() const {
 void DiagnosticInfoUnsupported::print(DiagnosticPrinter &DP) const {
   std::string Str;
   raw_string_ostream OS(Str);
-
   OS << getLocationStr() << ": in function " << getFunction().getName() << ' '
      << *getFunction().getFunctionType() << ": " << Msg << '\n';
   OS.flush();
@@ -317,6 +316,16 @@ void DiagnosticInfoUnsupported::print(DiagnosticPrinter &DP) const {
 
 void DiagnosticInfoISelFallback::print(DiagnosticPrinter &DP) const {
   DP << "Instruction selection used fallback path for " << getFunction();
+}
+
+// Luca
+void DiagnosticInfoEliminatedCode::print(DiagnosticPrinter &DP) const {
+  std::string Str;
+  raw_string_ostream OS(Str);
+
+  OS << getLocationStr() << ": This code has been eliminated by the optimizer[" << tag << "]";
+  OS.flush();
+  DP << Str;
 }
 
 void DiagnosticInfoOptimizationBase::insert(StringRef S) {

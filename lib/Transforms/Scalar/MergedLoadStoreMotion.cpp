@@ -87,6 +87,9 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "mldst-motion"
@@ -243,6 +246,10 @@ bool MergedLoadStoreMotion::sinkStore(BasicBlock *BB, StoreInst *S0,
     Instruction *ANew = A0->clone();
     SNew->insertBefore(&*InsertPt);
     ANew->insertBefore(SNew);
+
+    //Luca
+    addInfluencers(*SNew, *S0);
+    addInfluencers(*SNew, *S1);
 
     assert(S0->getParent() == A0->getParent());
     assert(S1->getParent() == A1->getParent());

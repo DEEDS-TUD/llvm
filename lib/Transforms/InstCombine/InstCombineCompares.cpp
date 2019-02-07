@@ -26,6 +26,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/KnownBits.h"
 
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -2638,6 +2640,9 @@ Instruction *InstCombiner::foldICmpBinOpEqualityWithConstant(ICmpInst &Cmp,
         // the explicit xor.
         return new ICmpInst(Pred, BOp0, ConstantExpr::getXor(RHS, BOC));
       } else if (C.isNullValue()) {
+        // Luca
+        propagateInfluenceTraces(&Cmp, *BO);
+
         // Replace ((xor A, B) != 0) with (A != B)
         return new ICmpInst(Pred, BOp0, BOp1);
       }
@@ -2651,6 +2656,9 @@ Instruction *InstCombiner::foldICmpBinOpEqualityWithConstant(ICmpInst &Cmp,
         Constant *SubC = ConstantExpr::getSub(cast<Constant>(BOp0), RHS);
         return new ICmpInst(Pred, BOp1, SubC);
       } else if (C.isNullValue()) {
+        // Luca
+        propagateInfluenceTraces(&Cmp, *BO);
+
         // Replace ((sub A, B) != 0) with (A != B).
         return new ICmpInst(Pred, BOp0, BOp1);
       }
@@ -3518,6 +3526,12 @@ Instruction *InstCombiner::foldICmpEquality(ICmpInst &I) {
     }
 
     if (X) { // Build (X^Y) & Z
+      // Luca
+      std::set<unsigned> influencers = Op0->getInfluenceTraces();
+      addInfluencers(&I, influencers);
+      influencers = Op1->getInfluenceTraces();
+      addInfluencers(&I, influencers);
+
       Op1 = Builder.CreateXor(X, Y);
       Op1 = Builder.CreateAnd(Op1, Z);
       I.setOperand(0, Op1);
@@ -3635,10 +3649,21 @@ Instruction *InstCombiner::foldICmpWithCastAndCast(ICmpInst &ICmp) {
         // If the pointer types don't match, insert a bitcast.
         if (LHSCIOp->getType() != RHSOp->getType())
           RHSOp = Builder.CreateBitCast(RHSOp, LHSCIOp->getType());
+
+        // Luca
+        std::set<unsigned> influencers = RHSC->getInfluenceTraces();
+        addInfluencers(RHSCIOp, influencers);
       }
     } else if (auto *RHSC = dyn_cast<Constant>(ICmp.getOperand(1))) {
       RHSOp = ConstantExpr::getIntToPtr(RHSC, SrcTy);
+
+      // Luca
+      std::set<unsigned> influencers = RHSC->getInfluenceTraces();
+      addInfluencers(RHSCIOp, influencers);
     }
+
+    // Luca
+    propagateInfluenceTraces(LHSCIOp, *LHSCI);
 
     if (RHSOp)
       return new ICmpInst(ICmp.getPredicate(), LHSCIOp, RHSOp);
@@ -3663,6 +3688,10 @@ Instruction *InstCombiner::foldICmpWithCastAndCast(ICmpInst &ICmp) {
     // and the other is a zext), then we can't handle this.
     if (CI->getOpcode() != LHSCI->getOpcode())
       return nullptr;
+
+    // Luca
+    propagateInfluenceTraces(LHSCIOp, *LHSCI);
+    propagateInfluenceTraces(RHSCIOp, *CI);
 
     // Deal with equality cases early.
     if (ICmp.isEquality())
@@ -3689,6 +3718,9 @@ Instruction *InstCombiner::foldICmpWithCastAndCast(ICmpInst &ICmp) {
 
   // If the re-extended constant didn't change...
   if (Res2 == C) {
+    // Luca
+    propagateInfluenceTraces(LHSCIOp, *LHSCI);
+
     // Deal with equality cases early.
     if (ICmp.isEquality())
       return new ICmpInst(ICmp.getPredicate(), LHSCIOp, Res1);
@@ -3719,6 +3751,9 @@ Instruction *InstCombiner::foldICmpWithCastAndCast(ICmpInst &ICmp) {
   // This is true if the input is >= 0. [aka >s -1]
   Constant *NegOne = Constant::getAllOnesValue(SrcTy);
   Value *Result = Builder.CreateICmpSGT(LHSCIOp, NegOne, ICmp.getName());
+
+  // Luca
+  propagateInfluenceTraces(LHSCIOp, *LHSCI);
 
   // Finally, return the value computed.
   if (ICmp.getPredicate() == ICmpInst::ICMP_ULT)
@@ -4538,6 +4573,9 @@ static Instruction *canonicalizeICmpBool(ICmpInst &I,
       case CmpInst::ICMP_EQ:  // A ==   0 -> !A
       case CmpInst::ICMP_ULE: // A <=u  0 -> !A
       case CmpInst::ICMP_SGE: // A >=s  0 -> !A
+        // Luca
+        propagateInfluenceTraces(A, I);
+
         return BinaryOperator::CreateNot(A);
       default:
         llvm_unreachable("ICmp i1 X, C not simplified as expected.");
@@ -4547,6 +4585,9 @@ static Instruction *canonicalizeICmpBool(ICmpInst &I,
       case CmpInst::ICMP_NE:  // A !=  1 -> !A
       case CmpInst::ICMP_ULT: // A <u  1 -> !A
       case CmpInst::ICMP_SGT: // A >s -1 -> !A
+        // Luca
+        propagateInfluenceTraces(A, I);
+
         return BinaryOperator::CreateNot(A);
       default:
         llvm_unreachable("ICmp i1 X, C not simplified as expected.");

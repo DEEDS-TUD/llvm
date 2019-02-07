@@ -94,6 +94,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 #ifndef NDEBUG
 // We only use this for a debug check.
 #include <random>
@@ -1244,6 +1247,9 @@ static void speculatePHINodeLoads(PHINode &PN) {
   IRBuilderTy PHIBuilder(&PN);
   PHINode *NewPN = PHIBuilder.CreatePHI(LoadTy, PN.getNumIncomingValues(),
                                         PN.getName() + ".sroa.speculated");
+
+  //Luca
+  addInfluencers(*cast<Instruction>(NewPN), PN);
 
   // Get the AA tags and alignment to use from one of the loads.  It doesn't
   // matter which one we get and if any differ.
@@ -2422,6 +2428,7 @@ private:
     assert(EndIndex > BeginIndex && "Empty vector!");
 
     Value *V = IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "load");
+
     return extractVector(IRB, V, BeginIndex, EndIndex, "vec");
   }
 
@@ -2430,6 +2437,10 @@ private:
     assert(!LI.isVolatile());
     Value *V = IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "load");
     V = convertValue(DL, IRB, V, IntTy);
+
+    //Luca
+    propagateInfluenceTraces(V, LI);
+
     assert(NewBeginOffset >= NewAllocaBeginOffset && "Out of bounds offset");
     uint64_t Offset = NewBeginOffset - NewAllocaBeginOffset;
     if (Offset > 0 || NewEndOffset < NewAllocaEndOffset) {
@@ -2479,6 +2490,9 @@ private:
       if (LI.isVolatile())
         NewLI->setAtomic(LI.getOrdering(), LI.getSyncScopeID());
 
+      //Luca
+      propagateInfluenceTraces(NewLI, LI);
+
       // Any !nonnull metadata or !range metadata on the old load is also valid
       // on the new load. This is even true in some cases even when the loads
       // are different types, for example by mapping !nonnull metadata to
@@ -2515,6 +2529,9 @@ private:
         NewLI->setAAMetadata(AATags);
       if (LI.isVolatile())
         NewLI->setAtomic(LI.getOrdering(), LI.getSyncScopeID());
+
+      //Luca
+      propagateInfluenceTraces(NewLI, LI);
 
       V = NewLI;
       IsPtrAdjusted = true;
@@ -2576,6 +2593,9 @@ private:
       Store->setAAMetadata(AATags);
     Pass.DeadInsts.insert(&SI);
 
+    //Luca
+    propagateInfluenceTraces(Store, SI);
+
     LLVM_DEBUG(dbgs() << "          to: " << *Store << "\n");
     return true;
   }
@@ -2594,6 +2614,10 @@ private:
     V = convertValue(DL, IRB, V, NewAllocaTy);
     StoreInst *Store = IRB.CreateAlignedStore(V, &NewAI, NewAI.getAlignment());
     Store->copyMetadata(SI, LLVMContext::MD_mem_parallel_loop_access);
+
+    //Luca
+    propagateInfluenceTraces(Store, SI);
+
     if (AATags)
       Store->setAAMetadata(AATags);
     Pass.DeadInsts.insert(&SI);
@@ -2663,6 +2687,10 @@ private:
                                      SI.isVolatile());
     }
     NewSI->copyMetadata(SI, LLVMContext::MD_mem_parallel_loop_access);
+
+    //Luca
+    propagateInfluenceTraces(NewSI, SI);
+
     if (AATags)
       NewSI->setAAMetadata(AATags);
     if (SI.isVolatile())
@@ -2932,6 +2960,10 @@ private:
       }
       CallInst *New = IRB.CreateMemCpy(DestPtr, DestAlign, SrcPtr, SrcAlign,
                                        Size, II.isVolatile());
+
+      //Luca
+      propagateInfluenceTraces(New, II);
+
       if (AATags)
         New->setAAMetadata(AATags);
       LLVM_DEBUG(dbgs() << "          to: " << *New << "\n");
@@ -3006,6 +3038,10 @@ private:
         IRB.CreateAlignedStore(Src, DstPtr, DstAlign, II.isVolatile()));
     if (AATags)
       Store->setAAMetadata(AATags);
+
+    //Luca
+    propagateInfluenceTraces(Store, II);
+
     LLVM_DEBUG(dbgs() << "          to: " << *Store << "\n");
     return !II.isVolatile();
   }
@@ -3278,6 +3314,11 @@ private:
       // Load the single value and insert it using the indices.
       Value *GEP =
           IRB.CreateInBoundsGEP(nullptr, Ptr, GEPIndices, Name + ".gep");
+
+      //Luca
+      std::set<unsigned> influencers = Agg->getInfluenceTraces();
+      addInfluencers(GEP, influencers);
+
       LoadInst *Load = IRB.CreateLoad(GEP, Name + ".load");
       if (AATags)
         Load->setAAMetadata(AATags);
@@ -3320,6 +3361,11 @@ private:
           IRB.CreateExtractValue(Agg, Indices, Name + ".extract");
       Value *InBoundsGEP =
           IRB.CreateInBoundsGEP(nullptr, Ptr, GEPIndices, Name + ".gep");
+
+      //Luca
+      std::set<unsigned> influencers = Agg->getInfluenceTraces();
+      addInfluencers(InBoundsGEP, influencers);
+
       StoreInst *Store = IRB.CreateStore(ExtractValue, InBoundsGEP);
       if (AATags)
         Store->setAAMetadata(AATags);
@@ -4239,6 +4285,9 @@ bool SROA::splitAlloca(AllocaInst &AI, AllocaSlices &AS) {
     if (AllocaInst *NewAI = rewritePartition(AI, AS, P)) {
       Changed = true;
       if (NewAI != &AI) {
+        //Luca
+        propagateInfluenceTraces(NewAI, AI);
+
         uint64_t SizeOfByte = 8;
         uint64_t AllocaSize = DL.getTypeSizeInBits(NewAI->getAllocatedType());
         // Don't include any padding.

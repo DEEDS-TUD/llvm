@@ -79,6 +79,9 @@
 #include <utility>
 #include <vector>
 
+//Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1182,6 +1185,9 @@ bool SimplifyCFGOpt::FoldValueComparisonIntoPredecessors(TerminatorInst *TI,
       for (ValueEqualityComparisonCase &V : PredCases)
         NewSI->addCase(V.Value, V.Dest);
 
+      //Luca
+      propagateInfluenceTraces(NewSI, *PTI);
+
       if (PredHasWeights || SuccHasWeights) {
         // Halve the weights if any of them cannot fit in an uint32_t
         FitWeights(Weights);
@@ -1322,6 +1328,9 @@ static bool HoistThenElseCodeToIf(BranchInst *BI,
       // location is the merged locations of the original instructions.
       I1->applyMergedLocation(I1->getDebugLoc(), I2->getDebugLoc());
 
+      //Luca
+      propagateInfluenceTraces(I1, *I2);
+
       I2->eraseFromParent();
       Changed = true;
     }
@@ -1374,6 +1383,13 @@ HoistTerminator:
     I2->replaceAllUsesWith(NT);
     NT->takeName(I1);
   }
+  // Luca
+  else {
+    propagateInfluenceTraces(NT, *I2);
+  }
+
+  // Luca
+  propagateInfluenceTraces(NT, *BI);
 
   IRBuilder<NoFolder> Builder(NT);
   // Hoisting one of the terminators from our successor is a great thing.
@@ -2101,6 +2117,11 @@ static bool SpeculativelyExecuteBB(BranchInst *BI, BasicBlock *ThenBB,
         BrCond, TrueV, FalseV, "spec.select", BI);
     PN.setIncomingValue(OrigI, V);
     PN.setIncomingValue(ThenI, V);
+
+    // Luca
+    propagateInfluenceTraces(V, *BI);
+    propagateInfluenceTraces(V, *ThenBB->getTerminator());
+    propagateInfluenceTraces(V, *EndBB->getTerminator());
   }
 
   // Remove speculated dbg intrinsics.
@@ -2402,7 +2423,17 @@ static bool FoldTwoEntryPHINode(PHINode *PN, const TargetTransformInfo &TTI,
   // avoid other simplifycfg's kicking in on the diamond.
   TerminatorInst *OldTI = DomBlock->getTerminator();
   Builder.SetInsertPoint(OldTI);
-  Builder.CreateBr(BB);
+  BranchInst* newBr = Builder.CreateBr(BB);
+
+  // Luca
+  propagateInfluenceTraces(newBr, *OldTI);
+  if (IfBlock1) {
+    propagateInfluenceTraces(newBr, *IfBlock1->getTerminator());
+  }
+  if (IfBlock2) {
+    propagateInfluenceTraces(newBr, *IfBlock2->getTerminator());
+  }
+
   OldTI->eraseFromParent();
   return true;
 }
@@ -2722,6 +2753,9 @@ bool llvm::FoldBranchToCommonDest(BranchInst *BI, unsigned BonusInstThreshold) {
       Instruction *NewCond = cast<Instruction>(
           Builder.CreateBinOp(Opc, PBI->getCondition(), New, "or.cond"));
       PBI->setCondition(NewCond);
+
+      // Luca
+      propagateInfluenceTraces(NewCond, *BI);
 
       uint64_t PredTrueWeight, PredFalseWeight, SuccTrueWeight, SuccFalseWeight;
       bool HasWeights =
@@ -3322,6 +3356,9 @@ static bool SimplifyCondBranchToCondBranch(BranchInst *PBI, BranchInst *BI,
 
   // Merge the conditions.
   Value *Cond = Builder.CreateOr(PBICond, BICond, "brmerge");
+
+  // Luca
+  propagateInfluenceTraces(Cond, *BI);
 
   // Modify PBI to branch on the new condition to the new dests.
   PBI->setCondition(Cond);
@@ -4030,7 +4067,10 @@ static bool mergeCleanupPad(CleanupReturnInst *RI) {
   SuccessorCleanupPad->eraseFromParent();
   // Now, we simply replace the cleanupret with a branch to the unwind
   // destination.
-  BranchInst::Create(UnwindDest, RI->getParent());
+
+  //Luca
+  BranchInst* NewBI = BranchInst::Create(UnwindDest, RI->getParent());
+  propagateInfluenceTraces(NewBI, *cast<Instruction>(RI));
   RI->eraseFromParent();
 
   return true;

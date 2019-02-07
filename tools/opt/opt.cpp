@@ -445,6 +445,7 @@ int main(int argc, char **argv) {
   initializeIPO(Registry);
   initializeAnalysis(Registry);
   initializeTransformUtils(Registry);
+  initializeInfluenceTracing(Registry);//Luca
   initializeInstCombine(Registry);
   initializeAggressiveInstCombine(Registry);
   initializeInstrumentation(Registry);

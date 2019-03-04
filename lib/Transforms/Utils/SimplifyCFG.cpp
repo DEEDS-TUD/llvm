@@ -724,6 +724,10 @@ BasicBlock *SimplifyCFGOpt::GetValueEqualityComparisonCases(
 
   BranchInst *BI = cast<BranchInst>(TI);
   ICmpInst *ICI = cast<ICmpInst>(BI->getCondition());
+
+  // Luca
+  propagateInfluenceTraces(ICI->getOperand(1), *ICI);
+
   BasicBlock *Succ = BI->getSuccessor(ICI->getPredicate() == ICmpInst::ICMP_NE);
   Cases.push_back(ValueEqualityComparisonCase(
       GetConstantInt(ICI->getOperand(1), DL), Succ));
@@ -1187,6 +1191,7 @@ bool SimplifyCFGOpt::FoldValueComparisonIntoPredecessors(TerminatorInst *TI,
 
       //Luca
       propagateInfluenceTraces(NewSI, *PTI);
+      propagateInfluenceTraces(NewSI, *TI);
 
       if (PredHasWeights || SuccHasWeights) {
         // Halve the weights if any of them cannot fit in an uint32_t
@@ -1890,9 +1895,13 @@ static Value *isSafeToSpeculateStore(Instruction *I, BasicBlock *BrBB,
 
     if (auto *SI = dyn_cast<StoreInst>(&CurI)) {
       // Found the previous store make sure it stores to the same location.
-      if (SI->getPointerOperand() == StorePtr)
+      if (SI->getPointerOperand() == StorePtr) {
+        // Luca
+        propagateInfluenceTraces(StoreToHoist, *SI);
+
         // Found the previous store, return its value operand.
         return SI->getValueOperand();
+      }
       return nullptr; // Unknown store.
     }
   }
@@ -2081,6 +2090,10 @@ static bool SpeculativelyExecuteBB(BranchInst *BI, BasicBlock *ThenBB,
       std::swap(TrueV, FalseV);
     Value *S = Builder.CreateSelect(
         BrCond, TrueV, FalseV, "spec.store.select", BI);
+
+    // Luca
+    SpeculatedStore->addInfluencers(SpeculatedStore->getOperand(0));
+
     SpeculatedStore->setOperand(0, S);
     SpeculatedStore->applyMergedLocation(BI->getDebugLoc(),
                                          SpeculatedStore->getDebugLoc());
@@ -2749,13 +2762,13 @@ bool llvm::FoldBranchToCommonDest(BranchInst *BI, unsigned BonusInstThreshold) {
     New->takeName(Cond);
     Cond->setName(New->getName() + ".old");
 
+    // Luca
+    propagateInfluenceTraces(PBI, *BI);
+
     if (BI->isConditional()) {
       Instruction *NewCond = cast<Instruction>(
           Builder.CreateBinOp(Opc, PBI->getCondition(), New, "or.cond"));
       PBI->setCondition(NewCond);
-
-      // Luca
-      propagateInfluenceTraces(NewCond, *BI);
 
       uint64_t PredTrueWeight, PredFalseWeight, SuccTrueWeight, SuccFalseWeight;
       bool HasWeights =
@@ -2841,6 +2854,10 @@ bool llvm::FoldBranchToCommonDest(BranchInst *BI, unsigned BonusInstThreshold) {
       }
       // Change PBI from Conditional to Unconditional.
       BranchInst *New_PBI = BranchInst::Create(TrueDest, PBI);
+
+      // Luca
+      propagateInfluenceTraces(New_PBI, *PBI);
+
       EraseTerminatorInstAndDCECond(PBI);
       PBI = New_PBI;
     }
@@ -3405,6 +3422,10 @@ static bool SimplifyCondBranchToCondBranch(BranchInst *PBI, BranchInst *BI,
       SelectInst *NV = cast<SelectInst>(
           Builder.CreateSelect(PBICond, PBIV, BIV, PBIV->getName() + ".mux"));
       PN.setIncomingValue(PBBIdx, NV);
+
+      // Luca
+      NV->addInfluencers(PBI);
+
       // Although the select has the same condition as PBI, the original branch
       // weights for PBI do not apply to the new select because the select's
       // 'logical' edges are incoming edges of the phi that is eliminated, not
@@ -4376,6 +4397,9 @@ static bool TurnSwitchRangeIntoICmp(SwitchInst *SI, IRBuilder<> &Builder) {
     Cmp = Builder.CreateICmpULT(Sub, NumCases, "switch");
   BranchInst *NewBI = Builder.CreateCondBr(Cmp, ContiguousDest, OtherDest);
 
+  // Luca
+  propagateInfluenceTraces(NewBI, *SI);
+
   // Update weight for the newly-created conditional branch.
   if (HasBranchWeights(SI)) {
     SmallVector<uint64_t, 8> Weights;
@@ -4681,6 +4705,9 @@ GetCaseResults(SwitchInst *SI, ConstantInt *CaseVal, BasicBlock *CaseDest,
         return false;
       Pred = CaseDest;
       CaseDest = T->getSuccessor(0);
+
+      // Luca
+      SI->addInfluencers(T);
     } else if (Constant *C = ConstantFold(&I, DL, ConstantPool)) {
       // Instruction is side-effect free and constant.
 
@@ -5469,6 +5496,9 @@ static bool SwitchToLookupTable(SwitchInst *SI, IRBuilder<> &Builder,
                             FuncName);
 
     Value *Result = Table.BuildLookup(TableIndex, Builder);
+
+    // Luca
+    Result->addInfluencers(SI);
 
     // If the result is used to return immediately from the function, we want to
     // do that right here.

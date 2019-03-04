@@ -383,6 +383,9 @@ void GlobalVariable::copyAttributesFrom(const GlobalVariable *Src) {
   setThreadLocalMode(Src->getThreadLocalMode());
   setExternallyInitialized(Src->isExternallyInitialized());
   setAttributes(Src->getAttributes());
+
+  // Luca
+  addInfluencers(Src);
 }
 
 void GlobalVariable::dropAllReferences() {

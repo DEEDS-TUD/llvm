@@ -71,6 +71,9 @@
 #include <utility>
 #include <vector>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using ProfileCount = Function::ProfileCount;
 
@@ -1349,6 +1352,14 @@ static bool allocaWouldBeStaticInEntry(const AllocaInst *AI ) {
 /// to encode location where these instructions are inlined.
 static void fixupLineNumbers(Function *Fn, Function::iterator FI,
                              Instruction *TheCall, bool CalleeHasDebugInfo) {
+  // Luca
+  for (Function::iterator I = FI; I != Fn->end(); ++I) {
+    for (BasicBlock::iterator BI = I->begin(), BE = I->end();
+         BI != BE; ++BI) {
+      propagateInfluenceTraces(cast<Value>(BI), *TheCall);
+    }
+  }
+
   const DebugLoc &TheCallDL = TheCall->getDebugLoc();
   if (!TheCallDL)
     return;
@@ -1370,6 +1381,7 @@ static void fixupLineNumbers(Function *Fn, Function::iterator FI,
   for (; FI != Fn->end(); ++FI) {
     for (BasicBlock::iterator BI = FI->begin(), BE = FI->end();
          BI != BE; ++BI) {
+
       if (DebugLoc DL = BI->getDebugLoc()) {
         auto IA = DebugLoc::appendInlinedAt(DL, InlinedAtNode, BI->getContext(),
                                             IANodes);
@@ -2186,6 +2198,13 @@ bool llvm::InlineFunction(CallSite CS, InlineFunctionInfo &IFI,
     if (InvokeInst *II = dyn_cast<InvokeInst>(TheCall)) {
       BranchInst *NewBr = BranchInst::Create(II->getNormalDest(), TheCall);
       NewBr->setDebugLoc(Returns[0]->getDebugLoc());
+
+      // Luca
+      propagateInfluenceTraces(NewBr, *Returns[0]);
+    }
+    //Luca
+    else {
+      propagateInfluenceTraces(TheCall->getParent()->getTerminator(), *Returns[0]);
     }
 
     // If the return instruction returned a value, replace uses of the call with
@@ -2288,6 +2307,10 @@ bool llvm::InlineFunction(CallSite CS, InlineFunctionInfo &IFI,
     for (unsigned i = 0, e = Returns.size(); i != e; ++i) {
       ReturnInst *RI = Returns[i];
       BranchInst* BI = BranchInst::Create(AfterCallBB, RI);
+
+      // Luca
+      propagateInfluenceTraces(BI, *RI);
+
       Loc = RI->getDebugLoc();
       BI->setDebugLoc(Loc);
       RI->eraseFromParent();
@@ -2302,10 +2325,17 @@ bool llvm::InlineFunction(CallSite CS, InlineFunctionInfo &IFI,
     // Otherwise, if there is exactly one return value, just replace anything
     // using the return value of the call with the computed value.
     if (!TheCall->use_empty()) {
+      // Luca
+      propagateInfluenceTraces(Returns[0]->getReturnValue(), *Returns[0]);
+
       if (TheCall == Returns[0]->getReturnValue())
         TheCall->replaceAllUsesWith(UndefValue::get(TheCall->getType()));
       else
         TheCall->replaceAllUsesWith(Returns[0]->getReturnValue());
+    }
+    // Luca
+    else {
+      propagateInfluenceTraces(AfterCallBB, *Returns[0]);
     }
 
     // Update PHI nodes that use the ReturnBB to use the AfterCallBB.

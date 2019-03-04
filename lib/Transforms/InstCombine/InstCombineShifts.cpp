@@ -516,8 +516,12 @@ Instruction *InstCombiner::FoldShiftByConstant(Value *Op0, Constant *Op1,
             Builder.CreateBinOp(I.getOpcode(), Op0BO->getOperand(0), Op1);
           NewShift->takeName(Op0BO);
 
-          return BinaryOperator::Create(Op0BO->getOpcode(), NewShift,
+          Instruction* ret = BinaryOperator::Create(Op0BO->getOpcode(), NewShift,
                                         NewRHS);
+
+          // Luca
+          ret->addInfluencers(Op0BO);
+          return ret;
         }
       }
 

@@ -2048,10 +2048,12 @@ Constant *ConstantExpr::getFCmp(unsigned short pred, Constant *LHS,
 
   if (Constant *FC = ConstantFoldCompareInstruction(pred, LHS, RHS)) {
     // Luca
-    std::set<unsigned> influencers = LHS->getInfluenceTraces();
+    FC->addInfluencers(LHS);
+    FC->addInfluencers(RHS);
+    /*std::set<unsigned> influencers = LHS->getInfluenceTraces();
     addInfluencers(FC, influencers);
     influencers = RHS->getInfluenceTraces();
-    addInfluencers(FC, influencers);
+    addInfluencers(FC, influencers);*/
 
     return FC;          // Fold a few common cases...
   }

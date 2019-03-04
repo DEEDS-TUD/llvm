@@ -19,6 +19,10 @@
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/KnownBits.h"
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -268,6 +272,11 @@ Instruction *InstCombiner::commonCastTransforms(CastInst &CI) {
       // the second cast (CI). CSrc will then have a good chance of being dead.
       auto *Ty = CI.getType();
       auto *Res = CastInst::Create(NewOpc, CSrc->getOperand(0), Ty);
+
+      // Luca
+      propagateInfluenceTraces(Res, CI);
+      propagateInfluenceTraces(Res, *CSrc);
+
       // Point debug users of the dying cast to the new one.
       if (CSrc->hasOneUse())
         replaceAllDbgUsesWith(*CSrc, *Res, CI, DT);
@@ -1098,7 +1107,11 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
     // We need to emit an AND to clear the high bits.
     Constant *C = ConstantInt::get(Res->getType(),
                                APInt::getLowBitsSet(DestBitSize, SrcBitsKept));
-    return BinaryOperator::CreateAnd(Res, C);
+    Instruction *And = BinaryOperator::CreateAnd(Res, C);
+
+    // Luca
+    And->addInfluencers(Src);
+    return And;
   }
 
   // If this is a TRUNC followed by a ZEXT then we are dealing with integral
@@ -1121,20 +1134,32 @@ Instruction *InstCombiner::visitZExt(ZExtInst &CI) {
       APInt AndValue(APInt::getLowBitsSet(SrcSize, MidSize));
       Constant *AndConst = ConstantInt::get(A->getType(), AndValue);
       Value *And = Builder.CreateAnd(A, AndConst, CSrc->getName() + ".mask");
+
+      // Luca
+      And->addInfluencers(Src);
+
       return new ZExtInst(And, CI.getType());
     }
 
     if (SrcSize == DstSize) {
       APInt AndValue(APInt::getLowBitsSet(SrcSize, MidSize));
-      return BinaryOperator::CreateAnd(A, ConstantInt::get(A->getType(),
+      Instruction *And = BinaryOperator::CreateAnd(A, ConstantInt::get(A->getType(),
                                                            AndValue));
+
+      // Luca
+      And->addInfluencers(Src);
+      return And;
     }
     if (SrcSize > DstSize) {
       Value *Trunc = Builder.CreateTrunc(A, CI.getType());
       APInt AndValue(APInt::getLowBitsSet(DstSize, MidSize));
-      return BinaryOperator::CreateAnd(Trunc,
+      Instruction *And = BinaryOperator::CreateAnd(Trunc,
                                        ConstantInt::get(Trunc->getType(),
                                                         AndValue));
+
+      // Luca
+      And->addInfluencers(Src);
+      return And;
     }
   }
 
@@ -1755,6 +1780,10 @@ Instruction *InstCombiner::commonPointerCastTransforms(CastInst &CI) {
       // here because the pointer operand is being replaced with another
       // pointer operand so the opcode doesn't need to change.
       Worklist.Add(GEP);
+
+      // Luca
+      GEP->getOperand(0)->addInfluencers(GEP);
+
       CI.setOperand(0, GEP->getOperand(0));
       return &CI;
     }

@@ -171,7 +171,7 @@ bool llvm::MergeBlockIntoPredecessor(BasicBlock *BB, DominatorTree *DT,
 
   //Luca
   Instruction& OldBr = PredBB->getInstList().back();
-  addInfluencers(BB->front(), OldBr);
+  propagateInfluenceTraces(BB->getTerminator(), OldBr);
 
   
   // Delete the unconditional branch from the predecessor...

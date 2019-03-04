@@ -1249,7 +1249,7 @@ static void speculatePHINodeLoads(PHINode &PN) {
                                         PN.getName() + ".sroa.speculated");
 
   //Luca
-  addInfluencers(*cast<Instruction>(NewPN), PN);
+  NewPN->addInfluencers(&PN);
 
   // Get the AA tags and alignment to use from one of the loads.  It doesn't
   // matter which one we get and if any differ.
@@ -1594,6 +1594,9 @@ static Value *getAdjustedPtr(IRBuilderTy &IRB, const DataLayout &DL, Value *Ptr,
     Indices.clear();
     if (Value *P = getNaturalGEPWithOffset(IRB, DL, Ptr, Offset, TargetTy,
                                            Indices, NamePrefix)) {
+      // Luca
+      P->addInfluencers(Ptr);
+
       // If we have a new natural pointer at the offset, clear out any old
       // offset pointer we computed. Unless it is the base pointer or
       // a non-instruction, we built a GEP we don't need. Zap it.
@@ -1642,6 +1645,7 @@ static Value *getAdjustedPtr(IRBuilderTy &IRB, const DataLayout &DL, Value *Ptr,
                                             IRB.getInt(Int8PtrOffset),
                                             NamePrefix + "sroa_raw_idx");
   }
+
   Ptr = OffsetPtr;
 
   // On the off chance we were targeting i8*, guard the bitcast here.
@@ -2378,6 +2382,7 @@ private:
           OldName = OldName.substr(OffsetEnd + 1);
       }
     }
+
     // Strip any SROA suffixes as well.
     OldName = OldName.substr(0, OldName.find(".sroa_"));
 #endif
@@ -2463,6 +2468,10 @@ private:
     LLVM_DEBUG(dbgs() << "    original: " << LI << "\n");
     Value *OldOp = LI.getOperand(0);
     assert(OldOp == OldPtr);
+
+    // Luca
+    traces_t influencers = getInfluencersRecursive(OldOp);
+    LI.addInfluencers(influencers);
 
     AAMDNodes AATags;
     LI.getAAMetadata(AATags);
@@ -2630,6 +2639,10 @@ private:
     Value *OldOp = SI.getOperand(1);
     assert(OldOp == OldPtr);
 
+    // Luca
+    traces_t influencers = getInfluencersRecursive(OldOp);
+    SI.addInfluencers(influencers);
+
     AAMDNodes AATags;
     SI.getAAMetadata(AATags);
 
@@ -2739,6 +2752,10 @@ private:
   bool visitMemSetInst(MemSetInst &II) {
     LLVM_DEBUG(dbgs() << "    original: " << II << "\n");
     assert(II.getRawDest() == OldPtr);
+
+    // Luca
+    traces_t influencers = getInfluencersRecursive(OldPtr);
+    II.addInfluencers(influencers);
 
     AAMDNodes AATags;
     II.getAAMetadata(AATags);
@@ -2858,6 +2875,10 @@ private:
     bool IsDest = &II.getRawDestUse() == OldUse;
     assert((IsDest && II.getRawDest() == OldPtr) ||
            (!IsDest && II.getRawSource() == OldPtr));
+
+    // Luca
+    traces_t influencers = getInfluencersRecursive(OldPtr);
+    II.addInfluencers(influencers);
 
     unsigned SliceAlign = getSliceAlign();
 
@@ -3008,11 +3029,17 @@ private:
     if (VecTy && !IsWholeAlloca && !IsDest) {
       Src = IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "load");
       Src = extractVector(IRB, Src, BeginIndex, EndIndex, "vec");
+
+      //Luca
+      Src->addInfluencers(DstPtr);
     } else if (IntTy && !IsWholeAlloca && !IsDest) {
       Src = IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "load");
       Src = convertValue(DL, IRB, Src, IntTy);
       uint64_t Offset = NewBeginOffset - NewAllocaBeginOffset;
       Src = extractInteger(DL, IRB, Src, SubIntTy, Offset, "extract");
+
+      //Luca
+      Src->addInfluencers(DstPtr);
     } else {
       LoadInst *Load = IRB.CreateAlignedLoad(SrcPtr, SrcAlign, II.isVolatile(),
                                              "copyload");
@@ -3025,6 +3052,9 @@ private:
       Value *Old =
           IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "oldload");
       Src = insertVector(IRB, Old, Src, BeginIndex, "vec");
+
+      //Luca
+      Src->addInfluencers(SrcPtr);
     } else if (IntTy && !IsWholeAlloca && IsDest) {
       Value *Old =
           IRB.CreateAlignedLoad(&NewAI, NewAI.getAlignment(), "oldload");
@@ -3032,6 +3062,9 @@ private:
       uint64_t Offset = NewBeginOffset - NewAllocaBeginOffset;
       Src = insertInteger(DL, IRB, Old, Src, Offset, "insert");
       Src = convertValue(DL, IRB, Src, NewAllocaTy);
+
+      //Luca
+      Src->addInfluencers(SrcPtr);
     }
 
     StoreInst *Store = cast<StoreInst>(
@@ -3051,6 +3084,10 @@ private:
            II.getIntrinsicID() == Intrinsic::lifetime_end);
     LLVM_DEBUG(dbgs() << "    original: " << II << "\n");
     assert(II.getArgOperand(1) == OldPtr);
+
+    // Luca
+    traces_t influencers = getInfluencersRecursive(OldPtr);
+    II.addInfluencers(influencers);
 
     // Record this instruction for deletion.
     Pass.DeadInsts.insert(&II);
@@ -3316,8 +3353,7 @@ private:
           IRB.CreateInBoundsGEP(nullptr, Ptr, GEPIndices, Name + ".gep");
 
       //Luca
-      std::set<unsigned> influencers = Agg->getInfluenceTraces();
-      addInfluencers(GEP, influencers);
+      GEP->addInfluencers(Agg);
 
       LoadInst *Load = IRB.CreateLoad(GEP, Name + ".load");
       if (AATags)
@@ -3363,8 +3399,7 @@ private:
           IRB.CreateInBoundsGEP(nullptr, Ptr, GEPIndices, Name + ".gep");
 
       //Luca
-      std::set<unsigned> influencers = Agg->getInfluenceTraces();
-      addInfluencers(InBoundsGEP, influencers);
+      InBoundsGEP->addInfluencers(Agg);
 
       StoreInst *Store = IRB.CreateStore(ExtractValue, InBoundsGEP);
       if (AATags)

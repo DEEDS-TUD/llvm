@@ -119,6 +119,9 @@ BasicBlock *llvm::foldBlockIntoPredecessor(BasicBlock *BB, LoopInfo *LI,
   // OnlyPred to OnlySucc.
   FoldSingleEntryPHINodes(BB);
 
+  // Luca
+  BB->getTerminator()->addInfluencers(OnlyPred->getTerminator());
+
   // Delete the unconditional branch from the predecessor...
   OnlyPred->getInstList().pop_back();
 
@@ -753,7 +756,11 @@ LoopUnrollResult llvm::UnrollLoop(
         }
       }
       // Replace the conditional branch with an unconditional one.
-      BranchInst::Create(Dest, Term);
+      BranchInst* NewBI = BranchInst::Create(Dest, Term);
+
+      // Luca
+      NewBI->addInfluencers(Term);
+
       Term->eraseFromParent();
     }
   }

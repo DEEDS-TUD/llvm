@@ -493,7 +493,7 @@ Instruction *MemCpyOptPass::tryMergingIntoMemset(Instruction *StartInst,
     // Zap all the stores.
     for (Instruction *SI : Range.TheStores) {
       //Luca
-      addInfluencers(*AMemSet, *SI);
+      AMemSet->addInfluencers(SI);
 
       MD->removeInstruction(SI);
       SI->eraseFromParent();
@@ -696,8 +696,8 @@ bool MemCpyOptPass::processStore(StoreInst *SI, BasicBlock::iterator &BBI) {
           ++NumMemCpyInstr;
 
           //Luca
-          addInfluencers(*M, *SI);
-          addInfluencers(*M, *LI);
+          M->addInfluencers(SI);
+          M->addInfluencers(LI);
 
           // Make sure we do not invalidate the iterator.
           BBI = M->getIterator();
@@ -783,7 +783,7 @@ bool MemCpyOptPass::processStore(StoreInst *SI, BasicBlock::iterator &BBI) {
       LLVM_DEBUG(dbgs() << "Promoting " << *SI << " to " << *M << "\n");
 
       //Luca
-      addInfluencers(*M, *SI);
+      M->addInfluencers(SI);
 
       MD->removeInstruction(SI);
       SI->eraseFromParent();

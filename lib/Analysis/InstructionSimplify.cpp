@@ -5071,6 +5071,10 @@ Value *llvm::SimplifyInstruction(Instruction *I, const SimplifyQuery &SQ,
       Result = ConstantInt::get(I->getType(), Known.getConstant());
   }
 
+  // Luca
+  if (Result)
+    Result->addInfluencersAndOperandInfluencers(I);
+
   /// If called on unreachable code, the above logic may report that the
   /// instruction simplified to itself.  Make life easier for users by
   /// detecting that case here, returning a safe value instead.

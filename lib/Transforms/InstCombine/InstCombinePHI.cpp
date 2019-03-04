@@ -620,6 +620,9 @@ Instruction *InstCombiner::FoldPHIArgLoadIntoPHI(PHINode &PN) {
   for (unsigned ID : KnownIDs)
     NewLI->setMetadata(ID, FirstLI->getMetadata(ID));
 
+  // Luca
+  NewLI->addInfluencers(FirstLI);
+
   // Add all operands to the new PHI and combine TBAA metadata.
   for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
     LoadInst *LI = cast<LoadInst>(PN.getIncomingValue(i));

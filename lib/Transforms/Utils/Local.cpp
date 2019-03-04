@@ -291,6 +291,9 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       if (MakeImplicitMD)
         NewBr->setMetadata(LLVMContext::MD_make_implicit, MakeImplicitMD);
 
+      // Luca
+      propagateInfluenceTraces(NewBr, *SI);
+
       // Delete the old switch.
       SI->eraseFromParent();
       return true;
@@ -714,6 +717,9 @@ void llvm::MergeBasicBlockIntoOnlyPred(BasicBlock *DestBB, DominatorTree *DT,
   // Anything that branched to PredBB now branches to DestBB.
   PredBB->replaceAllUsesWith(DestBB);
 
+  // Luca
+  propagateInfluenceTraces(DestBB->getTerminator(), *PredBB->getTerminator());
+
   // Splice all the instructions from PredBB to DestBB.
   PredBB->getTerminator()->eraseFromParent();
   DestBB->getInstList().splice(DestBB->begin(), PredBB->getInstList());
@@ -926,6 +932,9 @@ static void redirectValuesFromPredecessorsToPhi(BasicBlock *BB,
       Value *PredVal = OldValPN->getIncomingValue(i);
       Value *Selected = selectIncomingValueForBlock(PredVal, PredBB,
                                                     IncomingValues);
+
+      // Luca
+      propagateInfluenceTraces(Selected, *OldValPN);
 
       // And add a new incoming value for this predecessor for the
       // newly retargeted branch.
@@ -2341,6 +2350,9 @@ void llvm::combineMetadata(Instruction *K, const Instruction *J,
   if (auto *JMD = J->getMetadata(LLVMContext::MD_invariant_group))
     if (isa<LoadInst>(K) || isa<StoreInst>(K))
       K->setMetadata(LLVMContext::MD_invariant_group, JMD);
+
+  // Luca
+  K->addInfluencers(J);
 }
 
 void llvm::combineMetadataForCSE(Instruction *K, const Instruction *J) {
@@ -2378,6 +2390,9 @@ unsigned llvm::replaceNonLocalUsesWith(Instruction *From, Value *To) {
    assert(From->getType() == To->getType());
    auto *BB = From->getParent();
    unsigned Count = 0;
+
+   // Luca
+   To->addInfluencers(From);
 
   for (Value::use_iterator UI = From->use_begin(), UE = From->use_end();
        UI != UE;) {

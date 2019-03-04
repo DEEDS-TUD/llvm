@@ -657,8 +657,12 @@ bool JumpThreadingPass::ComputeValueKnownInPredecessors(
       return false;
 
     // Convert the known values.
-    for (auto &R : Result)
+    for (auto &R : Result) {
       R.first = ConstantExpr::getCast(CI->getOpcode(), R.first, CI->getType());
+
+      // Luca
+      R.first->addInfluencers(CI);
+    }
 
     return true;
   }
@@ -1665,7 +1669,11 @@ bool JumpThreadingPass::ProcessThreadableEdges(Value *Cond, BasicBlock *BB,
 
       // Finally update the terminator.
       TerminatorInst *Term = BB->getTerminator();
-      BranchInst::Create(OnlyDest, Term);
+      BranchInst* NewBI = BranchInst::Create(OnlyDest, Term);
+
+      // Luca
+      NewBI->addInfluencers(Term);
+
       Term->eraseFromParent();
       DDT->applyUpdates(Updates);
 
@@ -1993,6 +2001,9 @@ bool JumpThreadingPass::ThreadEdge(BasicBlock *BB,
   // an unconditional jump to SuccBB.  Insert the unconditional jump.
   BranchInst *NewBI = BranchInst::Create(SuccBB, NewBB);
   NewBI->setDebugLoc(BB->getTerminator()->getDebugLoc());
+
+  // Luca
+  NewBI->addInfluencers(BB->getTerminator());
 
   // Check to see if SuccBB has PHI nodes. If so, we need to add entries to the
   // PHI nodes for NewBB now.
@@ -2323,6 +2334,10 @@ bool JumpThreadingPass::DuplicateCondBranchOnPHIIntoPred(
       for (unsigned i = 0, e = New->getNumOperands(); i != e; ++i)
         if (BasicBlock *SuccBB = dyn_cast<BasicBlock>(New->getOperand(i)))
           Updates.push_back({DominatorTree::Insert, PredBB, SuccBB});
+
+      // Luca
+      if (isa<TerminatorInst>(New))
+        New->addInfluencers(OldPredBranch);
     }
   }
 

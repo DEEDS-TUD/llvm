@@ -3527,10 +3527,8 @@ Instruction *InstCombiner::foldICmpEquality(ICmpInst &I) {
 
     if (X) { // Build (X^Y) & Z
       // Luca
-      std::set<unsigned> influencers = Op0->getInfluenceTraces();
-      addInfluencers(&I, influencers);
-      influencers = Op1->getInfluenceTraces();
-      addInfluencers(&I, influencers);
+      I.addInfluencers(Op0);
+      I.addInfluencers(Op1);
 
       Op1 = Builder.CreateXor(X, Y);
       Op1 = Builder.CreateAnd(Op1, Z);
@@ -3651,15 +3649,10 @@ Instruction *InstCombiner::foldICmpWithCastAndCast(ICmpInst &ICmp) {
           RHSOp = Builder.CreateBitCast(RHSOp, LHSCIOp->getType());
 
         // Luca
-        std::set<unsigned> influencers = RHSC->getInfluenceTraces();
-        addInfluencers(RHSCIOp, influencers);
+        RHSCIOp->addInfluencers(RHSC);
       }
     } else if (auto *RHSC = dyn_cast<Constant>(ICmp.getOperand(1))) {
       RHSOp = ConstantExpr::getIntToPtr(RHSC, SrcTy);
-
-      // Luca
-      std::set<unsigned> influencers = RHSC->getInfluenceTraces();
-      addInfluencers(RHSCIOp, influencers);
     }
 
     // Luca

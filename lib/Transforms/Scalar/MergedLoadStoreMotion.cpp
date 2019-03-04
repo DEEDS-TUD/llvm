@@ -248,8 +248,8 @@ bool MergedLoadStoreMotion::sinkStore(BasicBlock *BB, StoreInst *S0,
     ANew->insertBefore(SNew);
 
     //Luca
-    addInfluencers(*SNew, *S0);
-    addInfluencers(*SNew, *S1);
+    SNew->addInfluencers(S0);
+    SNew->addInfluencers(S1);
 
     assert(S0->getParent() == A0->getParent());
     assert(S1->getParent() == A1->getParent());

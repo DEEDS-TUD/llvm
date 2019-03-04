@@ -41,6 +41,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <iterator>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 #define DEBUG_TYPE "evaluator"
 
 using namespace llvm;
@@ -368,6 +371,9 @@ bool Evaluator::EvaluateBlock(BasicBlock::iterator CurInst,
         }
       }
 
+      // Luca
+      propagateInfluenceTraces(Val, *SI);
+
       MutatedMemory[Ptr] = Val;
     } else if (BinaryOperator *BO = dyn_cast<BinaryOperator>(CurInst)) {
       InstResult = ConstantExpr::get(BO->getOpcode(),
@@ -628,6 +634,11 @@ bool Evaluator::EvaluateBlock(BasicBlock::iterator CurInst,
       setVal(&*CurInst, InstResult);
     }
 
+    // Luca
+    if (InstResult) {
+      propagateInfluenceTraces(InstResult, *CurInst);
+    }
+
     // If we just processed an invoke, we finished evaluating the block.
     if (InvokeInst *II = dyn_cast<InvokeInst>(CurInst)) {
       NextBB = II->getNormalDest();
@@ -679,8 +690,12 @@ bool Evaluator::EvaluateFunction(Function *F, Constant *&RetVal,
       // Successfully running until there's no next block means that we found
       // the return.  Fill it the return value and pop the call stack.
       ReturnInst *RI = cast<ReturnInst>(CurBB->getTerminator());
-      if (RI->getNumOperands())
+      if (RI->getNumOperands()) {
         RetVal = getVal(RI->getOperand(0));
+
+        // Luca
+        propagateInfluenceTraces(RetVal, *RI);
+      }
       CallStack.pop_back();
       return true;
     }

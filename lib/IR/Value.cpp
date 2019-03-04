@@ -70,7 +70,7 @@ Value::Value(Type *ty, unsigned scid)
     assert((VTy->isFirstClassType() || VTy->isVoidTy()) &&
            "Cannot create non-first-class values except for constants!");
   //Luca
-  static_assert(sizeof(Value) == 2 * sizeof(void *) + 2 * sizeof(unsigned) + sizeof(std::set<unsigned>),
+  static_assert(sizeof(Value) == 2 * sizeof(void *) + 2 * sizeof(unsigned) + sizeof(traces_t),
                 "Value too big");
 }
 
@@ -444,8 +444,7 @@ void Value::doRAUW(Value *New, bool NoMetadata) {
     propagateInfluenceTraces(New, *I);
   }
   else {
-    std::set<unsigned> influencers = getInfluenceTraces();
-    addInfluencers(New, influencers);
+    New->addInfluencers(this);
   }
 }
 
@@ -519,15 +518,13 @@ static const Value *stripPointerCastsAndOffsets(const Value *V) {
       V = GEP->getPointerOperand();
 
       // Luca
-      std::set<unsigned> influencers = GEP->getInfluenceTraces();
-      addInfluencers((Value*)(void*)V, influencers);
+      ((Value*)(void*)V)->addInfluencers(GEP);
 
     } else if (Operator::getOpcode(V) == Instruction::BitCast ||
                Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
 
       // Luca
-      std::set<unsigned> influencers = V->getInfluenceTraces();
-      addInfluencers(cast<Operator>(V)->getOperand(0), influencers);
+      cast<Operator>(V)->getOperand(0)->addInfluencers(V);
 
       V = cast<Operator>(V)->getOperand(0);
     } else if (auto *GA = dyn_cast<GlobalAlias>(V)) {
@@ -535,16 +532,14 @@ static const Value *stripPointerCastsAndOffsets(const Value *V) {
         return V;
 
       // Luca
-      std::set<unsigned> influencers = V->getInfluenceTraces();
-      addInfluencers((Value*)(void*)GA->getAliasee(), influencers);
+      ((Value*)(void*)GA->getAliasee())->addInfluencers(V);
 
       V = GA->getAliasee();
     } else {
       if (auto CS = ImmutableCallSite(V)) {
         if (const Value *RV = CS.getReturnedArgOperand()) {
           // Luca
-          std::set<unsigned> influencers = V->getInfluenceTraces();
-          addInfluencers((Value*)(void*)RV, influencers);
+          ((Value*)(void*)RV)->addInfluencers(V);
 
           V = RV;
           continue;
@@ -556,8 +551,7 @@ static const Value *stripPointerCastsAndOffsets(const Value *V) {
             (CS.getIntrinsicID() == Intrinsic::launder_invariant_group ||
              CS.getIntrinsicID() == Intrinsic::strip_invariant_group)) {
           // Luca
-          std::set<unsigned> influencers = V->getInfluenceTraces();
-          addInfluencers((Value*)(void*)CS.getArgOperand(0), influencers);
+          ((Value*)(void*)CS.getArgOperand(0))->addInfluencers(V);
 
           V = CS.getArgOperand(0);
           continue;
@@ -776,6 +770,18 @@ bool Value::isSwiftError() const {
   if (!Alloca)
     return false;
   return Alloca->isSwiftError();
+}
+
+// Luca
+void Value::addInfluencersAndOperandInfluencers(const Value* V) {
+  InfluenceTraces.insert(V->InfluenceTraces.begin(), V->InfluenceTraces.end());
+  if (const Instruction* I = dyn_cast<const Instruction>(V)) {
+    for (Value* O: I->operands()) {
+      if (!dyn_cast<Instruction>(O)) {
+        addInfluencers(O);
+      }
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

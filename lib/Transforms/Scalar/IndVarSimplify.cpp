@@ -2323,6 +2323,10 @@ linearFunctionTestReplace(Loop *L,
   }
   Value *Cond = Builder.CreateICmp(P, CmpIndVar, ExitCnt, "exitcond");
   Value *OrigCond = BI->getCondition();
+
+  // Luca
+  Cond->addInfluencers(OrigCond);
+
   // It's tempting to use replaceAllUsesWith here to fully replace the old
   // comparison, but that's not immediately safe, since users of the old
   // comparison may not be dominated by the new comparison. Instead, just

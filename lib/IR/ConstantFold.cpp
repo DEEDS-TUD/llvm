@@ -32,6 +32,10 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MathExtras.h"
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -920,6 +924,12 @@ Constant *llvm::ConstantFoldInsertValueInstruction(Constant *Agg,
 Constant *llvm::ConstantFoldBinaryInstruction(unsigned Opcode,
                                               Constant *C1, Constant *C2) {
   assert(Instruction::isBinaryOp(Opcode) && "Non-binary instruction detected");
+
+  // Luca
+  /*TODO: std::set<unsigned> influencers1 = C1->getInfluenceTraces(), influencers2 = C2->getInfluenceTraces();
+  addInfluencers(C1, influencers2);
+  addInfluencers(C2, influencers1);*/
+
 
   // Handle UndefValue up front.
   if (isa<UndefValue>(C1) || isa<UndefValue>(C2)) {

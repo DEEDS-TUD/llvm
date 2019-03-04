@@ -71,6 +71,9 @@
 #include <utility>
 #include <vector>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "globalopt"
@@ -1710,8 +1713,11 @@ static bool TryToShrinkGlobalToBoolean(GlobalVariable *GV, Constant *OtherVal) {
           assert(isa<LoadInst>(StoreVal) && "Not a load of NewGV!");
         }
       }
-      new StoreInst(StoreVal, NewGV, false, 0,
+      Instruction* NewSI = new StoreInst(StoreVal, NewGV, false, 0,
                     SI->getOrdering(), SI->getSyncScopeID(), SI);
+
+      // Luca
+      NewSI->addInfluencers(SI);
     } else {
       // Change the load into a load of bool then a select.
       LoadInst *LI = cast<LoadInst>(UI);
@@ -2389,12 +2395,18 @@ static void CommitValueTo(Constant *Val, Constant *Addr) {
   if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Addr)) {
     assert(GV->hasInitializer());
     GV->setInitializer(Val);
+
+    // Luca
+    GV->addInfluencers(Val);
     return;
   }
 
   ConstantExpr *CE = cast<ConstantExpr>(Addr);
   GlobalVariable *GV = cast<GlobalVariable>(CE->getOperand(0));
   GV->setInitializer(EvaluateStoreInto(GV->getInitializer(), Val, CE, 2));
+
+  // Luca
+  GV->addInfluencers(Val);
 }
 
 /// Given a map of address -> value, where addresses are expected to be some form

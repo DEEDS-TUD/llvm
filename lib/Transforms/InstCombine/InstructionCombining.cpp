@@ -2325,8 +2325,7 @@ Instruction *InstCombiner::visitBranchInst(BranchInst &BI) {
   if (match(&BI, m_Br(m_Not(m_Value(X)), TrueDest, FalseDest)) &&
       !isa<Constant>(X)) {
     //Luca
-    std::set<unsigned> influencers = BI.getCondition()->getInfluenceTraces();
-    addInfluencers(&BI, influencers);
+    BI.addInfluencers(BI.getCondition());
 
     // Swap Destinations and condition...
     BI.setCondition(X);
@@ -3181,6 +3180,9 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
           LLVM_DEBUG(dbgs() << "IC: ConstFold operand of: " << *Inst
                             << "\n    Old = " << *C
                             << "\n    New = " << *FoldRes << '\n');
+          // Luca
+          FoldRes->addInfluencers(C);
+
           U = FoldRes;
           MadeIRChange = true;
         }

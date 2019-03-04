@@ -42,6 +42,9 @@
 #include <cassert>
 #include <utility>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -581,7 +584,17 @@ static Value *foldSelectICmpAndOr(const ICmpInst *IC, Value *TrueVal,
   if (NeedXor)
     V = Builder.CreateXor(V, *C2);
 
-  return Builder.CreateOr(V, Y);
+  Value* ret = Builder.CreateOr(V, Y);
+
+
+  // Luca
+  if (OrOnFalseVal) {
+    ret->addInfluencers(FalseVal);
+  }
+  else {
+    ret->addInfluencers(TrueVal);
+  }
+  return ret;
 }
 
 /// Transform patterns such as: (a > b) ? a - b : 0
@@ -1266,6 +1279,11 @@ Instruction *InstCombiner::foldSelectExtConst(SelectInst &Sel) {
     // select Cond, (ext X), C --> ext(select Cond, X, C')
     // select Cond, C, (ext X) --> ext(select Cond, C', X)
     Value *NewSel = Builder.CreateSelect(Cond, X, TruncCVal, "narrow", &Sel);
+
+    // Luca
+    propagateInfluenceTraces(NewSel, Sel);
+    propagateInfluenceTraces(X, *ExtInst);
+
     return CastInst::Create(Instruction::CastOps(ExtOpcode), NewSel, SelType);
   }
 

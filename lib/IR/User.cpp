@@ -11,6 +11,9 @@
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/GlobalValue.h"
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 namespace llvm {
 class BasicBlock;
 
@@ -20,6 +23,9 @@ class BasicBlock;
 
 void User::replaceUsesOfWith(Value *From, Value *To) {
   if (From == To) return;   // Duh what?
+
+  // Luca
+  To->addInfluencers(From);
 
   assert((!isa<Constant>(this) || isa<GlobalValue>(this)) &&
          "Cannot call User::replaceUsesOfWith on a constant!");

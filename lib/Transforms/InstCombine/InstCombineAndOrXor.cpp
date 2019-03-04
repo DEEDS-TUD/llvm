@@ -18,6 +18,10 @@
 #include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -657,21 +661,108 @@ static Value *foldLogOpOfMaskedICmps(ICmpInst *LHS, ICmpInst *RHS, bool IsAnd,
     //   (icmp ne (A & B), B) & (icmp ne (A & D), D)
     // with B and D, having a single bit set.
     Value *Zero = Constant::getNullValue(A->getType());
-    return Builder.CreateICmp(NewCC, NewAnd, Zero);
+    Value* V = Builder.CreateICmp(NewCC, NewAnd, Zero);
+
+    // Luca
+    propagateInfluenceTraces(V, *LHS);
+    propagateInfluenceTraces(V, *RHS);
+    if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    return V;
   }
   if (Mask & BMask_AllOnes) {
     // (icmp eq (A & B), B) & (icmp eq (A & D), D)
     // -> (icmp eq (A & (B|D)), (B|D))
     Value *NewOr = Builder.CreateOr(B, D);
     Value *NewAnd = Builder.CreateAnd(A, NewOr);
-    return Builder.CreateICmp(NewCC, NewAnd, NewOr);
+    Value* V = Builder.CreateICmp(NewCC, NewAnd, NewOr);
+
+    // Luca
+    propagateInfluenceTraces(V, *LHS);
+    propagateInfluenceTraces(V, *RHS);
+    if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd, *I);
+    }
+    return V;
   }
   if (Mask & AMask_AllOnes) {
     // (icmp eq (A & B), A) & (icmp eq (A & D), A)
     // -> (icmp eq (A & (B&D)), A)
     Value *NewAnd1 = Builder.CreateAnd(B, D);
     Value *NewAnd2 = Builder.CreateAnd(A, NewAnd1);
-    return Builder.CreateICmp(NewCC, NewAnd2, A);
+    Value* V = Builder.CreateICmp(NewCC, NewAnd2, A);
+
+    // Luca
+    propagateInfluenceTraces(V, *LHS);
+    propagateInfluenceTraces(V, *RHS);
+    if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(LHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<BinaryOperator>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(0))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    else if (Instruction* I = dyn_cast<Instruction>(RHS->getOperand(1))) {
+      propagateInfluenceTraces(NewAnd1, *I);
+    }
+    return V;
   }
 
   // Remaining cases assume at least that B and D are constant, and depend on
@@ -1061,8 +1152,13 @@ Value *InstCombiner::foldAndOfICmps(ICmpInst *LHS, ICmpInst *RHS,
         return Builder.CreateICmp(PredL, LHS0, RHSC);
       break;                 // (X u> 13 & X != 15) -> no change
     case ICmpInst::ICMP_ULT: // (X u> 13 & X u< 15) -> (X-14) <u 1
-      return insertRangeTest(LHS0, LHSC->getValue() + 1, RHSC->getValue(),
+      Value* V = insertRangeTest(LHS0, LHSC->getValue() + 1, RHSC->getValue(),
                              false, true);
+
+      // Luca
+      V->addInfluencers(LHS);
+      V->addInfluencers(RHS);
+      return V;
     }
     break;
   case ICmpInst::ICMP_SGT:
@@ -1074,8 +1170,13 @@ Value *InstCombiner::foldAndOfICmps(ICmpInst *LHS, ICmpInst *RHS,
         return Builder.CreateICmp(PredL, LHS0, RHSC);
       break;                 // (X s> 13 & X != 15) -> no change
     case ICmpInst::ICMP_SLT: // (X s> 13 & X s< 15) -> (X-14) s< 1
-      return insertRangeTest(LHS0, LHSC->getValue() + 1, RHSC->getValue(), true,
+      Value* V = insertRangeTest(LHS0, LHSC->getValue() + 1, RHSC->getValue(), true,
                              true);
+
+      // Luca
+      V->addInfluencers(LHS);
+      V->addInfluencers(RHS);
+      return V;
     }
     break;
   }
@@ -1150,7 +1251,12 @@ static Instruction *matchDeMorgansLaws(BinaryOperator &I,
       !IsFreeToInvert(A, A->hasOneUse()) &&
       !IsFreeToInvert(B, B->hasOneUse())) {
     Value *AndOr = Builder.CreateBinOp(Opcode, A, B, I.getName() + ".demorgan");
-    return BinaryOperator::CreateNot(AndOr);
+    Instruction* NewI = BinaryOperator::CreateNot(AndOr);
+
+    // Luca
+    NewI->addInfluencers(I.getOperand(0));
+    NewI->addInfluencers(I.getOperand(1));
+    return NewI;
   }
 
   return nullptr;
@@ -1976,8 +2082,13 @@ Value *InstCombiner::foldOrOfICmps(ICmpInst *LHS, ICmpInst *RHS,
       break;
     case ICmpInst::ICMP_UGT: // (X u< 13 | X u> 15) -> (X-13) u> 2
       assert(!RHSC->isMaxValue(false) && "Missed icmp simplification");
-      return insertRangeTest(LHS0, LHSC->getValue(), RHSC->getValue() + 1,
+      Value* V = insertRangeTest(LHS0, LHSC->getValue(), RHSC->getValue() + 1,
                              false, false);
+
+      // Luca
+      V->addInfluencers(LHS);
+      V->addInfluencers(RHS);
+      return V;
     }
     break;
   case ICmpInst::ICMP_SLT:
@@ -1988,8 +2099,13 @@ Value *InstCombiner::foldOrOfICmps(ICmpInst *LHS, ICmpInst *RHS,
       break;
     case ICmpInst::ICMP_SGT: // (X s< 13 | X s> 15) -> (X-13) s> 2
       assert(!RHSC->isMaxValue(true) && "Missed icmp simplification");
-      return insertRangeTest(LHS0, LHSC->getValue(), RHSC->getValue() + 1, true,
+      Value* V = insertRangeTest(LHS0, LHSC->getValue(), RHSC->getValue() + 1, true,
                              false);
+
+      // Luca
+      V->addInfluencers(LHS);
+      V->addInfluencers(RHS);
+      return V;
     }
     break;
   }

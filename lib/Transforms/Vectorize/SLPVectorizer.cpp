@@ -3712,6 +3712,10 @@ BoUpSLP::vectorizeTree(ExtraValueToDebugLocsMap &ExternallyUsedValues) {
         Value *Undef = UndefValue::get(Ty);
         Scalar->replaceAllUsesWith(Undef);
       }
+
+      // Luca
+      Entry->VectorizedValue->addInfluencers(Scalar);
+
       LLVM_DEBUG(dbgs() << "SLP: \tErasing scalar:" << *Scalar << ".\n");
       eraseInstruction(cast<Instruction>(Scalar));
     }

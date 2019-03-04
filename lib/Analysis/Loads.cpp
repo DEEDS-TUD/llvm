@@ -389,8 +389,7 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
           return nullptr;
 
         //Luca
-        std::set<unsigned> influencers = StrippedPtr->getInfluenceTraces();
-        addInfluencers(LI, influencers);
+        LI->addInfluencers(StrippedPtr);
 
         if (IsLoadCSE)
             *IsLoadCSE = true;
@@ -412,8 +411,7 @@ Value *llvm::FindAvailablePtrLoadStore(Value *Ptr, Type *AccessTy,
           return nullptr;
 
         //Luca
-        std::set<unsigned> influencers = StrippedPtr->getInfluenceTraces();
-        addInfluencers(SI, influencers);
+        SI->addInfluencers(StrippedPtr);
 
         if (IsLoadCSE)
           *IsLoadCSE = false;

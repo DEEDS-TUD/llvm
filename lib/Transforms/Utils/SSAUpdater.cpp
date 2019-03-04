@@ -380,6 +380,9 @@ run(const SmallVectorImpl<Instruction *> &Insts) const {
       if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
         updateDebugInfo(SI);
         SSA.AddAvailableValue(BB, SI->getOperand(0));
+
+        // Luca
+        SI->getOperand(0)->addInfluencers(SI);
       } else
         // Otherwise it is a load, queue it to rewrite as a live-in load.
         LiveInLoads.push_back(cast<LoadInst>(User));
@@ -436,6 +439,9 @@ run(const SmallVectorImpl<Instruction *> &Insts) const {
 
         // Remember that this is the active value in the block.
         StoredValue = SI->getOperand(0);
+
+        // Luca
+        StoredValue->addInfluencers(SI);
       }
     }
 

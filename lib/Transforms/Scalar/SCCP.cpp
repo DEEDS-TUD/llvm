@@ -59,6 +59,9 @@
 #include <utility>
 #include <vector>
 
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "sccp"
@@ -781,6 +784,9 @@ void SCCPSolver::visitReturnInst(ReturnInst &I) {
 
   Function *F = I.getParent()->getParent();
   Value *ResultOp = I.getOperand(0);
+
+  // Luca
+  ResultOp->addInfluencers(&I);
 
   // If we are tracking the return value of this function, merge it in.
   if (!TrackedRetVals.empty() && !ResultOp->getType()->isStructTy()) {

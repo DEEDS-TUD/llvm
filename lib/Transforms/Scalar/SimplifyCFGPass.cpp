@@ -41,6 +41,10 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include <utility>
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "simplifycfg"
@@ -113,6 +117,9 @@ static bool mergeEmptyReturnBlocks(Function &F) {
     if (Ret->getNumOperands() == 0 ||
         Ret->getOperand(0) ==
           cast<ReturnInst>(RetBlock->getTerminator())->getOperand(0)) {
+      // Luca
+      propagateInfluenceTraces(RetBlock->getTerminator(), *Ret);
+
       BB.replaceAllUsesWith(RetBlock);
       BB.eraseFromParent();
       continue;
@@ -131,6 +138,10 @@ static bool mergeEmptyReturnBlocks(Function &F) {
         RetBlockPHI->addIncoming(InVal, *PI);
       RetBlock->getTerminator()->setOperand(0, RetBlockPHI);
     }
+
+    // Luca
+    propagateInfluenceTraces(RetBlock->getTerminator(), *Ret);
+
 
     // Turn BB into a block that just unconditionally branches to the return
     // block.  This handles the case when the two return blocks have a common

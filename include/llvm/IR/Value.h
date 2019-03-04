@@ -22,7 +22,9 @@
 #include <cassert>
 #include <iterator>
 #include <memory>
-#include <set>
+
+// Luca
+#include "llvm/ADT/DenseSet.h"
 
 namespace llvm {
 
@@ -54,6 +56,10 @@ class User;
 
 using ValueName = StringMapEntry<Value *>;
 
+// Luca
+using trace_t = unsigned short;
+using traces_t = DenseSet<trace_t>;
+
 //===----------------------------------------------------------------------===//
 //                                 Value Class
 //===----------------------------------------------------------------------===//
@@ -78,7 +84,7 @@ class Value {
   Use *UseList;
 
   //Luca
-  std::set<unsigned> InfluenceTraces;
+  traces_t InfluenceTraces;
 
   friend class ValueAsMetadata; // Allow access to IsUsedByMD.
   friend class ValueHandleBase;
@@ -455,12 +461,22 @@ public:
   };
 
   //Luca
-  std::set<unsigned> getInfluenceTraces() const {
+  const traces_t& getInfluenceTraces() const {
     return InfluenceTraces;
   }
-  void setInfluenceTraces(std::set<unsigned>& traces) {
+  void setInfluenceTraces(traces_t&& traces) {
+    InfluenceTraces = std::move(traces);
+  }
+  void setInfluenceTraces(traces_t& traces) {
     InfluenceTraces = traces;
   }
+  void addInfluencers(const traces_t& influencers) {
+    InfluenceTraces.insert(influencers.begin(), influencers.end());
+  }
+  void addInfluencers(const Value* V) {
+    InfluenceTraces.insert(V->InfluenceTraces.begin(), V->InfluenceTraces.end());
+  }
+  void addInfluencersAndOperandInfluencers(const Value* V);
 
   /// Return an ID for the concrete type of this object.
   ///

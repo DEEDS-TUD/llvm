@@ -38,6 +38,10 @@
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+
+// Luca
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "loop-rotate"
@@ -380,10 +384,16 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
          PHINode *PN = dyn_cast<PHINode>(BI); ++BI)
       PN->addIncoming(PN->getIncomingValueForBlock(OrigHeader), OrigPreheader);
 
+  // Luca
+  traces_t influencers = LoopEntryBranch->getInfluenceTraces();
+
   // Now that OrigPreHeader has a clone of OrigHeader's terminator, remove
   // OrigPreHeader's old terminator (the original branch into the loop), and
   // remove the corresponding incoming values from the PHI nodes in OrigHeader.
   LoopEntryBranch->eraseFromParent();
+
+  // Luca
+  OrigPreheader->getTerminator()->addInfluencers(influencers);
 
 
   SmallVector<PHINode*, 2> InsertedPHIs;
@@ -463,6 +473,10 @@ bool LoopRotate::rotateLoop(Loop *L, bool SimplifiedLatch) {
     Exit->removePredecessor(OrigPreheader, true /*preserve LCSSA*/);
     BranchInst *NewBI = BranchInst::Create(NewHeader, PHBI);
     NewBI->setDebugLoc(PHBI->getDebugLoc());
+
+    // Luca
+    propagateInfluenceTraces(NewBI, *PHBI);
+
     PHBI->eraseFromParent();
 
     // With our CFG finalized, update DomTree if it is available.
@@ -591,6 +605,9 @@ bool LoopRotate::simplifyLoopLatch(Loop *L) {
   unsigned FallThruPath = BI->getSuccessor(0) == Latch ? 0 : 1;
   BasicBlock *Header = Jmp->getSuccessor(0);
   assert(Header == L->getHeader() && "expected a backward branch");
+
+  // Luca
+  propagateInfluenceTraces(BI, *Jmp);
 
   // Remove Latch from the CFG so that LastExit becomes the new Latch.
   BI->setSuccessor(FallThruPath, Header);

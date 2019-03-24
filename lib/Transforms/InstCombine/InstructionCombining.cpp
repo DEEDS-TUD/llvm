@@ -318,6 +318,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "B op C" simplify?
         if (Value *V = SimplifyBinOp(Opcode, B, C, SQ.getWithInstruction(&I))) {
+          // Luca
+          V->addInfluencers(Op0);
+
           // It simplifies to V.  Form "A op V".
           I.setOperand(0, A);
           I.setOperand(1, V);
@@ -347,6 +350,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "A op B" simplify?
         if (Value *V = SimplifyBinOp(Opcode, A, B, SQ.getWithInstruction(&I))) {
+          // Luca
+          V->addInfluencers(Op1);
+
           // It simplifies to V.  Form "V op C".
           I.setOperand(0, V);
           I.setOperand(1, C);
@@ -375,6 +381,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "C op A" simplify?
         if (Value *V = SimplifyBinOp(Opcode, C, A, SQ.getWithInstruction(&I))) {
+          // Luca
+          V->addInfluencers(Op0);
+
           // It simplifies to V.  Form "V op B".
           I.setOperand(0, V);
           I.setOperand(1, B);
@@ -395,6 +404,9 @@ bool InstCombiner::SimplifyAssociativeOrCommutative(BinaryOperator &I) {
 
         // Does "C op A" simplify?
         if (Value *V = SimplifyBinOp(Opcode, C, A, SQ.getWithInstruction(&I))) {
+          // Luca
+          V->addInfluencers(Op1);
+
           // It simplifies to V.  Form "B op V".
           I.setOperand(0, B);
           I.setOperand(1, V);
@@ -1711,14 +1723,19 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
       Indices.append(GEP.idx_begin()+1, GEP.idx_end());
     }
 
-    if (!Indices.empty())
-      return GEP.isInBounds() && Src->isInBounds()
+    if (!Indices.empty()) {
+      GetElementPtrInst* NewGEP = GEP.isInBounds() && Src->isInBounds()
                  ? GetElementPtrInst::CreateInBounds(
                        Src->getSourceElementType(), Src->getOperand(0), Indices,
                        GEP.getName())
                  : GetElementPtrInst::Create(Src->getSourceElementType(),
                                              Src->getOperand(0), Indices,
                                              GEP.getName());
+
+      // Luca
+      NewGEP->addInfluencersAndOperandInfluencers(Src);
+      return NewGEP;
+    }
   }
 
   if (GEP.getNumIndices() == 1) {

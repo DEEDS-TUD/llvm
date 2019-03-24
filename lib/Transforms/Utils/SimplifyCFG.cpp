@@ -4919,6 +4919,9 @@ static bool switchToSelect(SwitchInst *SI, IRBuilder<> &Builder,
   Value *SelectValue =
       ConvertTwoCaseSwitch(UniqueResults, DefaultResult, Cond, Builder);
   if (SelectValue) {
+    // Luca
+    SelectValue->addInfluencers(SI);
+
     RemoveSwitchAfterSelectConversion(SI, PHI, SelectValue, Builder);
     return true;
   }

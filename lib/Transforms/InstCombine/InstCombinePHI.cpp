@@ -794,6 +794,9 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
 
   // Add all operands to the new PHI.
   for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i) {
+    // Luca
+    FirstInst->addInfluencers(PN.getIncomingValue(i));
+
     Value *NewInVal = cast<Instruction>(PN.getIncomingValue(i))->getOperand(0);
     if (NewInVal != InVal)
       InVal = nullptr;
@@ -815,6 +818,10 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   if (CastInst *FirstCI = dyn_cast<CastInst>(FirstInst)) {
     CastInst *NewCI = CastInst::Create(FirstCI->getOpcode(), PhiVal,
                                        PN.getType());
+
+    // Luca
+    NewCI->addInfluencers(FirstCI);
+
     PHIArgMergedDebugLoc(NewCI, PN);
     return NewCI;
   }
@@ -822,6 +829,9 @@ Instruction *InstCombiner::FoldPHIArgOpIntoPHI(PHINode &PN) {
   if (BinaryOperator *BinOp = dyn_cast<BinaryOperator>(FirstInst)) {
     BinOp = BinaryOperator::Create(BinOp->getOpcode(), PhiVal, ConstantOp);
     BinOp->copyIRFlags(PN.getIncomingValue(0));
+
+    // Luca
+    BinOp->addInfluencers(FirstInst);
 
     for (unsigned i = 1, e = PN.getNumIncomingValues(); i != e; ++i)
       BinOp->andIRFlags(PN.getIncomingValue(i));

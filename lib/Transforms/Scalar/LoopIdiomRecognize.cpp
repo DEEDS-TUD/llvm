@@ -938,6 +938,11 @@ bool LoopIdiomRecognize::processLoopStridedStore(
     NewCall = Builder.CreateCall(MSP, {BasePtr, PatternPtr, NumBytes});
   }
 
+  // Luca
+  for (Value* V : Stores) {
+    NewCall->addInfluencers(V);
+  }
+
   LLVM_DEBUG(dbgs() << "  Formed memset: " << *NewCall << "\n"
                     << "    from store to: " << *Ev << " at: " << *TheStore
                     << "\n");
@@ -1069,6 +1074,12 @@ bool LoopIdiomRecognize::processLoopStoreOfLoopLoad(StoreInst *SI,
         NumBytes, StoreSize);
   }
   NewCall->setDebugLoc(SI->getDebugLoc());
+
+  // Luca
+  NewCall->addInfluencers(LI);
+  NewCall->addInfluencers(SI);
+  NewCall->addInfluencers(Preheader->getTerminator());
+  NewCall->addInfluencers(CurLoop->getLoopLatch()->getTerminator());
 
   LLVM_DEBUG(dbgs() << "  Formed memcpy: " << *NewCall << "\n"
                     << "    from load ptr=" << *LoadEv << " at: " << *LI << "\n"

@@ -1365,6 +1365,10 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
   KnownBits Known = computeKnownBits(Src, 0, &CI);
   if (Known.isNonNegative()) {
     Value *ZExt = Builder.CreateZExt(Src, DestTy);
+
+    // Luca
+    ZExt->addInfluencers(Src);
+
     return replaceInstUsesWith(CI, ZExt);
   }
 
@@ -1382,6 +1386,9 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
     Value *Res = EvaluateInDifferentType(Src, DestTy, true);
     assert(Res->getType() == DestTy);
 
+    // Luca
+    Res->addInfluencers(Src);
+
     uint32_t SrcBitSize = SrcTy->getScalarSizeInBits();
     uint32_t DestBitSize = DestTy->getScalarSizeInBits();
 
@@ -1392,8 +1399,13 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
 
     // We need to emit a shl + ashr to do the sign extend.
     Value *ShAmt = ConstantInt::get(DestTy, DestBitSize-SrcBitSize);
-    return BinaryOperator::CreateAShr(Builder.CreateShl(Res, ShAmt, "sext"),
+    Instruction* New = BinaryOperator::CreateAShr(Builder.CreateShl(Res, ShAmt, "sext"),
                                       ShAmt);
+
+    // Luca
+    New->addInfluencers(Src);
+
+    return New;
   }
 
   // If the input is a trunc from the destination type, then turn sext(trunc(x))
@@ -1404,7 +1416,12 @@ Instruction *InstCombiner::visitSExt(SExtInst &CI) {
     unsigned SrcBitSize = SrcTy->getScalarSizeInBits();
     unsigned DestBitSize = DestTy->getScalarSizeInBits();
     Constant *ShAmt = ConstantInt::get(DestTy, DestBitSize - SrcBitSize);
-    return BinaryOperator::CreateAShr(Builder.CreateShl(X, ShAmt), ShAmt);
+    Instruction* New =  BinaryOperator::CreateAShr(Builder.CreateShl(X, ShAmt), ShAmt);
+
+    // Luca
+    New->addInfluencers(Src);
+
+    return New;
   }
 
   if (ICmpInst *ICI = dyn_cast<ICmpInst>(Src))
@@ -2307,7 +2324,12 @@ Instruction *InstCombiner::visitBitCast(BitCastInst &CI) {
     // If we found a path from the src to dest, create the getelementptr now.
     if (SrcElTy == DstElTy) {
       SmallVector<Value *, 8> Idxs(NumZeros + 1, Builder.getInt32(0));
-      return GetElementPtrInst::CreateInBounds(Src, Idxs);
+      GetElementPtrInst* NewGEP = GetElementPtrInst::CreateInBounds(Src, Idxs);
+
+      // Luca
+      NewGEP->addInfluencers(Src);
+
+      return NewGEP;
     }
   }
 

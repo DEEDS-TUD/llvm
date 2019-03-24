@@ -183,7 +183,8 @@ namespace {
     InfluenceTracingDetectEliminatedInstructions() : ModulePass(ID) {}
     
     bool runOnModule(Module &M) override {
-      DenseMap<trace_t, DebugLoc> eliminatedInstructions(inputInstructionLocations);
+      std::map<trace_t, DebugLoc> eliminatedInstructions;
+      eliminatedInstructions.insert(inputInstructionLocations.begin(), inputInstructionLocations.end());
       unsigned inputCnt = inputInstructionLocations.size();
       for (Function& F: M) {
         for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {

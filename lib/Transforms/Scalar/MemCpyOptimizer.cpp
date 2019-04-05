@@ -689,15 +689,16 @@ bool MemCpyOptPass::processStore(StoreInst *SI, BasicBlock::iterator &BBI) {
           LLVM_DEBUG(dbgs() << "Promoting " << *LI << " to " << *SI << " => "
                             << *M << "\n");
 
+
+          //Luca
+          M->addInfluencers(SI);
+          M->addInfluencers(LI);
+
           MD->removeInstruction(SI);
           SI->eraseFromParent();
           MD->removeInstruction(LI);
           LI->eraseFromParent();
           ++NumMemCpyInstr;
-
-          //Luca
-          M->addInfluencers(SI);
-          M->addInfluencers(LI);
 
           // Make sure we do not invalidate the iterator.
           BBI = M->getIterator();

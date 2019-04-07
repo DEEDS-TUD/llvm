@@ -1,3 +1,5 @@
+This project extends LLVM to facilitate influence tracing.
+
 The LLVM Compiler Infrastructure
 ================================
 
